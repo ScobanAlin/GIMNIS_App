@@ -1,9 +1,16 @@
-import { Router } from "express";  
-import { createCompetitor , deleteCompetitor} from "../controllers/competitorController";
+import { Router } from "express";
+import {
+  createCompetitor,
+  deleteCompetitor,
+  getAllcompetitors,
+  getCompetitorsByCategory,
+} from "../controllers/competitorController";
 
 const router = Router();
-router.delete("/competitors/:id", deleteCompetitor );
+
 router.post("/competitors", createCompetitor);
+router.get("/competitors", getAllcompetitors);
+router.get("/competitors/by-category", getCompetitorsByCategory);
+router.delete("/competitors/:id", deleteCompetitor);
 
-
-module.exports = router;
+export default router;

@@ -1,20 +1,15 @@
 import "dotenv/config";
-import { Pool, QueryResult } from "pg";
+import { Pool } from "pg";
 
 const ssl = process.env.PGSSLMODE === "require" ? { rejectUnauthorized: false } : undefined;
 
-const pool = new Pool(
-  process.env.DATABASE_URL
-    ? { connectionString: process.env.DATABASE_URL, ssl }
-    : {
-        host: process.env.PGHOST || "127.0.0.1",
-        port: Number(process.env.PGPORT || 5432),
-        database: process.env.PGDATABASE,
-        user: process.env.PGUSER,
-        password: process.env.PGPASSWORD,
-        ssl,
-      }
-);
+const pool = new Pool({
+  host: process.env.PGHOST,
+  port: Number(process.env.PGPORT),
+  database: process.env.PGDATABASE,
+  user: process.env.PGUSER,
+  password: process.env.PGPASSWORD,
+});
 
 export const createTables = async () => {
   const query = `
@@ -52,4 +47,4 @@ export const createTables = async () => {
 
 createTables();
 
-module.exports = pool;
+export default pool;
