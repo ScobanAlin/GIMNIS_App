@@ -17,28 +17,6 @@ export const setScore = async (
   return result.rows[0];
 };
 
-// 📊 Secretary updating multiple scores (spreadsheet)
-export const updateCompetitorScores = async (
-  competitorId: number,
-  scores: Record<string, string | number>
-) => {
-  for (const [judgeName, value] of Object.entries(scores)) {
-    if (value === "N/A" || value === "" || value == null) continue;
-
-    await db.query(
-      `
-      UPDATE scores s
-      SET value = $1
-      FROM judges j
-      WHERE s.judge_id = j.id
-        AND (j.first_name || ' ' || j.last_name) = $2
-        AND s.competitor_id = $3
-    `,
-      [parseFloat(value as string), judgeName, competitorId]
-    );
-  }
-};
-
 // 📥 Fetch scores for a competitor
 export const fetchScoresByCompetitor = async (competitorId: number) => {
   const query = `

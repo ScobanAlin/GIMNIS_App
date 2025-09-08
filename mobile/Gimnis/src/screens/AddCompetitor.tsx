@@ -104,73 +104,82 @@ export default function AddCompetitor() {
     setMembers(updated);
   };
 
-  const submit = async () => {
-    setError(null);
+const submit = async () => {
+  setError(null);
 
-    // client-side validation
-    if (!teamName.trim() || !category || !club.trim()) {
-      setError("Please fill all team fields.");
+  // client-side validation
+  if (!teamName.trim() || !category || !club.trim()) {
+    setError("Please fill all team fields.");
+    Alert.alert("⚠️ Validation error", "Please fill all team fields.");
+    return;
+  }
+  for (const [i, m] of members.entries()) {
+    if (!m.first_name.trim() || !m.last_name.trim()) {
+      const msg = `Member ${i + 1}: first and last name required`;
+      setError(msg);
+      Alert.alert("⚠️ Validation error", msg);
       return;
     }
-    for (const [i, m] of members.entries()) {
-      if (!m.first_name.trim() || !m.last_name.trim()) {
-        setError(`Member ${i + 1}: first and last name required`);
-        return;
-      }
-      if (!m.age) {
-        setError(`Member ${i + 1}: age required`);
-        return;
-      }
-      if (!m.sex) {
-        setError(`Member ${i + 1}: sex must be chosen`);
-        return;
-      }
+    if (!m.age) {
+      const msg = `Member ${i + 1}: age required`;
+      setError(msg);
+      Alert.alert("⚠️ Validation error", msg);
+      return;
     }
-
-    const payload: CompetitorPayload = {
-      name: teamName.trim(),
-      category: category.trim(),
-      club: club.trim(),
-      members: members.map((m) => ({
-        first_name: m.first_name.trim(),
-        last_name: m.last_name.trim(),
-        email: m.email.trim().toLowerCase(),
-        age: Number(m.age),
-        sex: m.sex as "M" | "F",
-      })),
-    };
-
-    console.log("Submitting payload:", payload);
-
-    setLoading(true);
-    try {
-      const res = await fetch(`${BASE_URL}/api/competitors`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      console.log("API response:", data);
-
-      if (!res.ok) {
-        throw new Error(data?.error || `Request failed with ${res.status}`);
-      }
-
-      Alert.alert("✅ Success", "Competitor created!");
-      setTeamName("");
-      setCategory("");
-      setClub("");
-      setMembers([
-        { first_name: "", last_name: "", email: "", age: "", sex: "" },
-      ]);
-    } catch (e: any) {
-      console.error("Error creating competitor:", e);
-      setError(e.message || "Unexpected error");
-    } finally {
-      setLoading(false);
+    if (!m.sex) {
+      const msg = `Member ${i + 1}: sex must be chosen`;
+      setError(msg);
+      Alert.alert("⚠️ Validation error", msg);
+      return;
     }
+  }
+
+  const payload: CompetitorPayload = {
+    name: teamName.trim(),
+    category: category.trim(),
+    club: club.trim(),
+    members: members.map((m) => ({
+      first_name: m.first_name.trim(),
+      last_name: m.last_name.trim(),
+      email: m.email.trim().toLowerCase(),
+      age: Number(m.age),
+      sex: m.sex as "M" | "F",
+    })),
   };
+
+  console.log("Submitting payload:", payload);
+
+  setLoading(true);
+  try {
+    const res = await fetch(`${BASE_URL}/api/competitors`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    console.log("API response:", data);
+
+    if (!res.ok) {
+      throw new Error(data?.error || `Request failed with ${res.status}`);
+    }
+
+    Alert.alert("✅ Success", "Competitor created successfully!");
+    setTeamName("");
+    setCategory("");
+    setClub("");
+    setMembers([
+      { first_name: "", last_name: "", email: "", age: "", sex: "" },
+    ]);
+  } catch (e: any) {
+    console.error("Error creating competitor:", e);
+    const msg = e.message || "Unexpected error while creating competitor.";
+    setError(msg);
+    Alert.alert("❌ Error", msg);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
