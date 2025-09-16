@@ -31,7 +31,6 @@ type MemberPayload = {
 };
 
 type CompetitorPayload = {
-  name: string;
   category: string;
   club: string;
   members: MemberPayload[];
@@ -60,7 +59,6 @@ const CATEGORIES = [
 ];
 
 export default function AddCompetitor() {
-  const [teamName, setTeamName] = useState("");
   const [category, setCategory] = useState<string>("");
   const [club, setClub] = useState("");
   const [members, setMembers] = useState<Member[]>([
@@ -104,94 +102,86 @@ export default function AddCompetitor() {
     setMembers(updated);
   };
 
-const submit = async () => {
-  setError(null);
+  const submit = async () => {
+    setError(null);
 
-  // client-side validation
-  if (!teamName.trim() || !category || !club.trim()) {
-    setError("Please fill all team fields.");
-    Alert.alert("⚠️ Validation error", "Please fill all team fields.");
-    return;
-  }
-  for (const [i, m] of members.entries()) {
-    if (!m.first_name.trim() || !m.last_name.trim()) {
-      const msg = `Member ${i + 1}: first and last name required`;
+    if (!category || !club.trim()) {
+      const msg = "Please fill all fields.";
       setError(msg);
       Alert.alert("⚠️ Validation error", msg);
       return;
     }
-    if (!m.age) {
-      const msg = `Member ${i + 1}: age required`;
-      setError(msg);
-      Alert.alert("⚠️ Validation error", msg);
-      return;
-    }
-    if (!m.sex) {
-      const msg = `Member ${i + 1}: sex must be chosen`;
-      setError(msg);
-      Alert.alert("⚠️ Validation error", msg);
-      return;
-    }
-  }
 
-  const payload: CompetitorPayload = {
-    name: teamName.trim(),
-    category: category.trim(),
-    club: club.trim(),
-    members: members.map((m) => ({
-      first_name: m.first_name.trim(),
-      last_name: m.last_name.trim(),
-      email: m.email.trim().toLowerCase(),
-      age: Number(m.age),
-      sex: m.sex as "M" | "F",
-    })),
+    for (const [i, m] of members.entries()) {
+      if (!m.first_name.trim() || !m.last_name.trim()) {
+        const msg = `Member ${i + 1}: first and last name required`;
+        setError(msg);
+        Alert.alert("⚠️ Validation error", msg);
+        return;
+      }
+      if (!m.age) {
+        const msg = `Member ${i + 1}: age required`;
+        setError(msg);
+        Alert.alert("⚠️ Validation error", msg);
+        return;
+      }
+      if (!m.sex) {
+        const msg = `Member ${i + 1}: sex must be chosen`;
+        setError(msg);
+        Alert.alert("⚠️ Validation error", msg);
+        return;
+      }
+    }
+
+    const payload: CompetitorPayload = {
+      category: category.trim(),
+      club: club.trim(),
+      members: members.map((m) => ({
+        first_name: m.first_name.trim(),
+        last_name: m.last_name.trim(),
+        email: m.email.trim().toLowerCase(),
+        age: Number(m.age),
+        sex: m.sex as "M" | "F",
+      })),
+    };
+
+    console.log("Submitting payload:", payload);
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/competitors`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      console.log("API response:", data);
+
+      if (!res.ok) {
+        throw new Error(data?.error || `Request failed with ${res.status}`);
+      }
+
+      Alert.alert("✅ Success", "Competitor created successfully!");
+      setCategory("");
+      setClub("");
+      setMembers([
+        { first_name: "", last_name: "", email: "", age: "", sex: "" },
+      ]);
+    } catch (e: any) {
+      console.error("Error creating competitor:", e);
+      const msg = e.message || "Unexpected error while creating competitor.";
+      setError(msg);
+      Alert.alert("❌ Error", msg);
+    } finally {
+      setLoading(false);
+    }
   };
-
-  console.log("Submitting payload:", payload);
-
-  setLoading(true);
-  try {
-    const res = await fetch(`${BASE_URL}/api/competitors`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    console.log("API response:", data);
-
-    if (!res.ok) {
-      throw new Error(data?.error || `Request failed with ${res.status}`);
-    }
-
-    Alert.alert("✅ Success", "Competitor created successfully!");
-    setTeamName("");
-    setCategory("");
-    setClub("");
-    setMembers([
-      { first_name: "", last_name: "", email: "", age: "", sex: "" },
-    ]);
-  } catch (e: any) {
-    console.error("Error creating competitor:", e);
-    const msg = e.message || "Unexpected error while creating competitor.";
-    setError(msg);
-    Alert.alert("❌ Error", msg);
-  } finally {
-    setLoading(false);
-  }
-};
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Add Competitor (Team)</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Team name"
-          value={teamName}
-          onChangeText={setTeamName}
-        />
 
         <View style={styles.pickerWrapper}>
           <Picker selectedValue={category} onValueChange={setCategory}>

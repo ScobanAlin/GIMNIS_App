@@ -1,4 +1,3 @@
-// src/models/voteModel.ts
 import db from "../db";
 
 export const setCurrentVote = async (competitorId: number) => {
@@ -14,12 +13,14 @@ export const clearVote = async () => {
 };
 
 export const fetchCurrentVote = async (judgeId?: number) => {
-  let competitorQuery = `
+  const competitorQuery = `
     SELECT cv.competitor_id,
-           c.name,
            c.category,
            c.club,
-           CASE WHEN $1::int IS NOT NULL AND s.id IS NOT NULL THEN true ELSE false END AS already_voted
+           CASE 
+             WHEN $1::int IS NOT NULL AND s.id IS NOT NULL 
+             THEN true ELSE false 
+           END AS already_voted
     FROM current_vote cv
     JOIN competitors c ON cv.competitor_id = c.id
     LEFT JOIN scores s 
@@ -28,7 +29,6 @@ export const fetchCurrentVote = async (judgeId?: number) => {
     LIMIT 1;
   `;
 
-  // fetch competitor info
   const competitorResult = await db.query(competitorQuery, [judgeId || null]);
   if (competitorResult.rows.length === 0) return null;
 
@@ -47,7 +47,6 @@ export const fetchCurrentVote = async (judgeId?: number) => {
 
   return {
     competitor_id: competitor.competitor_id,
-    name: competitor.name,
     category: competitor.category,
     club: competitor.club,
     already_voted: competitor.already_voted,

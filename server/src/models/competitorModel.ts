@@ -1,7 +1,7 @@
 import db from "../db";
 
+// ✅ Insert competitor (no team name anymore, just category + club)
 export const insertCompetitor = async (
-  name: string,
   category: string,
   club: string,
   members: {
@@ -12,12 +12,12 @@ export const insertCompetitor = async (
     sex: "M" | "F";
   }[]
 ) => {
-  // 1. Insert competitor team
+  // 1. Insert competitor
   const compRes = await db.query(
-    `INSERT INTO competitors (name, category, club)
-     VALUES ($1, $2, $3)
+    `INSERT INTO competitors (category, club)
+     VALUES ($1, $2)
      RETURNING *;`,
-    [name, category, club]
+    [category, club]
   );
   const competitor = compRes.rows[0];
 
@@ -31,20 +31,23 @@ export const insertCompetitor = async (
     );
   }
 
-  // Attach members in response
   competitor.members = members;
   return competitor;
 };
 
+// ✅ Delete competitor
 export const deleteCompetitorById = async (id: number) => {
-  const res = await db.query(`DELETE FROM competitors WHERE id=$1 RETURNING *;`, [id]);
+  const res = await db.query(
+    `DELETE FROM competitors WHERE id=$1 RETURNING *;`,
+    [id]
+  );
   return res.rows[0];
 };
 
+// ✅ Get all competitors + members
 export const getAllCompetitors = async () => {
   const query = `
     SELECT c.id as competitor_id,
-           c.name,
            c.category,
            c.club,
            m.id as member_id,
@@ -58,16 +61,14 @@ export const getAllCompetitors = async () => {
   `;
   const result = await db.query(query);
 
-  // group members into array
   const grouped: Record<number, any> = {};
-  result.rows.forEach(row => {
+  result.rows.forEach((row) => {
     if (!grouped[row.competitor_id]) {
       grouped[row.competitor_id] = {
         id: row.competitor_id,
-        name: row.name,
         category: row.category,
         club: row.club,
-        members: []
+        members: [],
       };
     }
     if (row.member_id) {
@@ -84,11 +85,11 @@ export const getAllCompetitors = async () => {
   return Object.values(grouped);
 };
 
+// ✅ Fetch competitors with scores (by category)
 export const fetchCompetitorsWithScores = async (category: string) => {
   const query = `
     SELECT 
       c.id AS competitor_id,
-      c.name AS competitor_name,
       c.category,
       c.club,
       m.id AS member_id,
@@ -98,7 +99,8 @@ export const fetchCompetitorsWithScores = async (category: string) => {
       m.sex AS member_sex,
       j.id AS judge_id,
       j.first_name || ' ' || j.last_name AS judge_name,
-      s.value AS score_value
+      s.value AS score_value,
+      s.score_type
     FROM competitors c
     LEFT JOIN competitor_members m ON m.competitor_id = c.id
     CROSS JOIN judges j
@@ -106,20 +108,17 @@ export const fetchCompetitorsWithScores = async (category: string) => {
       ON s.judge_id = j.id 
      AND s.competitor_id = c.id
     WHERE c.category = $1
-      AND j.role = 'judge'
     ORDER BY c.id, m.id, j.id;
   `;
 
   const result = await db.query(query, [category]);
 
-  // Group by competitor
   const grouped: Record<number, any> = {};
 
   for (const row of result.rows) {
     if (!grouped[row.competitor_id]) {
       grouped[row.competitor_id] = {
         id: row.competitor_id,
-        name: row.competitor_name,
         category: row.category,
         club: row.club,
         members: [],
@@ -141,9 +140,13 @@ export const fetchCompetitorsWithScores = async (category: string) => {
       });
     }
 
-    // add score for judge
-    grouped[row.competitor_id].scores[row.judge_name] =
-      row.score_value !== null ? Number(row.score_value) : "N/A";
+    // add score if present
+    if (row.judge_id) {
+      grouped[row.competitor_id].scores[row.judge_name] = {
+        value: row.score_value !== null ? Number(row.score_value) : "N/A",
+        type: row.score_type || null,
+      };
+    }
   }
 
   return Object.values(grouped);

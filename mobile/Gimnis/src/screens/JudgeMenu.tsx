@@ -26,12 +26,16 @@ type Member = {
 
 type CurrentCompetitor = {
   competitor_id: number;
-  name: string;
   category: string;
   club: string;
   already_voted?: boolean;
   members: Member[];
 } | null;
+
+// mock: this would come from logged-in user/session
+const judgeId = 2;
+const judgeRole: "execution" | "artistry" | "difficulty" | "principal" =
+  "execution"; // replace with actual role from API/session
 
 export default function JudgeMenu() {
   const navigation =
@@ -40,10 +44,7 @@ export default function JudgeMenu() {
   const [loading, setLoading] = useState(true);
   const [currentCompetitor, setCurrentCompetitor] =
     useState<CurrentCompetitor>(null);
-  const [score, setScore] = useState("");
-
-  // TODO: Replace with logged-in judge ID
-  const judgeId = 2;
+  const [scores, setScores] = useState<Record<string, string>>({});
 
   const fetchCurrentCompetitor = async () => {
     try {
@@ -59,7 +60,7 @@ export default function JudgeMenu() {
           setCurrentCompetitor(data);
         }
       } else {
-        setCurrentCompetitor(null); 
+        setCurrentCompetitor(null);
       }
     } catch (err) {
       console.error("Error fetching current competitor:", err);
@@ -69,16 +70,25 @@ export default function JudgeMenu() {
     }
   };
 
+  const handleScoreChange = (type: string, value: string) => {
+    setScores((prev) => ({ ...prev, [type]: value }));
+  };
+
   const confirmVote = () => {
     if (!currentCompetitor) return;
-    if (!score || isNaN(Number(score))) {
-      Alert.alert("Error", "Please enter a valid score.");
+
+    const filledScores = Object.entries(scores).filter(
+      ([, v]) => v && !isNaN(Number(v))
+    );
+
+    if (filledScores.length === 0) {
+      Alert.alert("Error", "Please enter at least one valid score.");
       return;
     }
 
     Alert.alert(
       "Confirm Vote",
-      `You are voting for ${currentCompetitor.name} with a score of ${score}. Do you want to submit?`,
+      `Submit your scores for competitor ${currentCompetitor.category} - ${currentCompetitor.club}?`,
       [
         { text: "Cancel", style: "cancel" },
         { text: "Submit", style: "destructive", onPress: voteCompetitor },
@@ -90,24 +100,30 @@ export default function JudgeMenu() {
     if (!currentCompetitor) return;
 
     try {
-      const res = await fetch(`${BASE_URL}/api/scores`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payloads = Object.entries(scores)
+        .filter(([, v]) => v && !isNaN(Number(v)))
+        .map(([score_type, value]) => ({
           competitor_id: currentCompetitor.competitor_id,
           judge_id: judgeId,
-          value: parseFloat(score),
-        }),
-      });
-      const data = await res.json();
+          value: parseFloat(value),
+          score_type,
+        }));
 
-      if (!res.ok) throw new Error(data?.error || "Failed to submit vote");
+      for (const p of payloads) {
+        const res = await fetch(`${BASE_URL}/api/scores`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(p),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Failed to submit score");
+      }
 
-      Alert.alert("✅ Success", "Your vote has been submitted!");
-      setScore("");
-         fetchCurrentCompetitor(); 
+      Alert.alert("✅ Success", "Your scores have been submitted!");
+      setScores({});
+      fetchCurrentCompetitor();
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Could not submit vote");
+      Alert.alert("Error", err.message || "Could not submit score(s)");
     }
   };
 
@@ -117,9 +133,63 @@ export default function JudgeMenu() {
     return () => clearInterval(interval);
   }, []);
 
+  const renderScoreInputs = () => {
+    if (judgeRole === "principal") {
+      return (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="Line penalization"
+            keyboardType="numeric"
+            value={scores["line_penalization"] || ""}
+            onChangeText={(t) => handleScoreChange("line_penalization", t)}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Principal penalization"
+            keyboardType="numeric"
+            value={scores["principal_penalization"] || ""}
+            onChangeText={(t) => handleScoreChange("principal_penalization", t)}
+          />
+        </>
+      );
+    } else if (judgeRole === "difficulty") {
+      return (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="Difficulty score"
+            keyboardType="numeric"
+            value={scores["difficulty"] || ""}
+            onChangeText={(t) => handleScoreChange("difficulty", t)}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Difficulty penalization"
+            keyboardType="numeric"
+            value={scores["difficulty_penalization"] || ""}
+            onChangeText={(t) =>
+              handleScoreChange("difficulty_penalization", t)
+            }
+          />
+        </>
+      );
+    } else {
+      return (
+        <TextInput
+          style={styles.input}
+          placeholder={`${judgeRole} score`}
+          keyboardType="numeric"
+          value={scores[judgeRole] || ""}
+          onChangeText={(t) => handleScoreChange(judgeRole, t)}
+        />
+      );
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Judge Menu</Text>
+      <Text style={styles.title}>Judge Menu ({judgeRole})</Text>
 
       <Pressable
         style={[styles.btn, styles.myScoresBtn]}
@@ -137,7 +207,6 @@ export default function JudgeMenu() {
       ) : currentCompetitor ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Current Competitor</Text>
-          <Text style={styles.competitorName}>{currentCompetitor.name}</Text>
           <Text style={styles.detail}>
             {currentCompetitor.category} • {currentCompetitor.club}
           </Text>
@@ -154,13 +223,8 @@ export default function JudgeMenu() {
             )}
           />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your score"
-            keyboardType="numeric"
-            value={score}
-            onChangeText={setScore}
-          />
+          {/* 🎯 Score inputs */}
+          {renderScoreInputs()}
 
           <Pressable style={[styles.btn, styles.voteBtn]} onPress={confirmVote}>
             <Text style={styles.btnText}>✅ Submit Vote</Text>
@@ -208,7 +272,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: "#0077cc",
   },
-  competitorName: { fontSize: 20, fontWeight: "700", marginBottom: 4 },
   detail: { fontSize: 16, color: "#666", marginBottom: 10 },
   memberText: { fontSize: 15, color: "#444", marginBottom: 4 },
   waiting: { fontSize: 16, color: "#999", marginTop: 40 },

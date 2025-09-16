@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   SafeAreaView,
   Text,
@@ -35,7 +35,7 @@ const categories = [
   "AD-JUNIORI",
 ];
 
-// API validate competitor (finalize total score)
+// --- API helpers ---
 async function validateCompetitor(competitorId: number) {
   const res = await fetch(`${BASE_URL}/api/scores/${competitorId}/validate`, {
     method: "POST",
@@ -45,75 +45,105 @@ async function validateCompetitor(competitorId: number) {
   return await res.json();
 }
 
-// check if all scores are filled
-const allScoresSubmitted = (scores?: Record<string, any>) => {
-  if (!scores) return false;
-  return Object.values(scores).every(
-    (v) => v !== null && v !== undefined && v !== "N/A" && v !== ""
-  );
-};
-
-// helper for grouping scores
-function groupScores(scores?: { [judge: string]: any }) {
-  if (!scores) {
-    return {
-      execution: [],
-      artistry: [],
-      difficulty: [],
-      line: [],
-      chrono: [],
-      principal: [],
-    };
-  }
-  const entries = Object.entries(scores);
-  return {
-    execution: entries.slice(0, 4),
-    artistry: entries.slice(4, 8),
-    difficulty: entries.slice(8, 10),
-    line: entries.slice(10, 11),
-    chrono: entries.slice(11, 12),
-    principal: entries.slice(12, 13),
-  };
-}
-
-// API fetch competitors
 async function fetchCompetitors(category: string) {
-  try {
-    const res = await fetch(
-      `${BASE_URL}/api/competitors/by-category?category=${encodeURIComponent(
-        category
-      )}`
-    );
-    if (!res.ok) throw new Error("Failed to fetch competitors");
-    return await res.json();
-  } catch (err) {
-    console.error("API error:", err);
-    return [];
-  }
+  const res = await fetch(
+    `${BASE_URL}/api/competitors/by-category?category=${encodeURIComponent(
+      category
+    )}`
+  );
+  if (!res.ok) throw new Error("Failed to fetch competitors");
+  return await res.json();
 }
 
-// API fetch scores for one competitor
 async function fetchCompetitorScores(competitorId: number) {
   const res = await fetch(`${BASE_URL}/api/scores/${competitorId}`);
   if (!res.ok) throw new Error("Failed to fetch scores");
   return await res.json();
 }
 
-// API submit score (one by one)
 async function submitScore(
   judge_id: number,
   competitor_id: number,
-  value: number
+  value: number,
+  score_type: string
 ) {
   const res = await fetch(`${BASE_URL}/api/scores`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ judge_id, competitor_id, value }),
+    body: JSON.stringify({ judge_id, competitor_id, value, score_type }),
   });
   if (!res.ok) throw new Error("Failed to update score");
   return await res.json();
 }
 
+// --- helpers ---
+function hasDiscrepancy(group: [string, any][]) {
+  const nums = group
+    .map(([_, v]) => (typeof v === "number" ? v : parseFloat(v)))
+    .filter((v) => !isNaN(v));
+  if (nums.length < 2) return false;
+  return Math.max(...nums) - Math.min(...nums) > 1.0;
+}
+
+function allScoresSubmitted(scores?: Record<string, any>) {
+  if (!scores) return false;
+  return Object.values(scores).every(
+    (v) => v !== null && v !== undefined && v !== "N/A" && v !== ""
+  );
+}
+
+function groupScores(
+  scores: Record<string, any>,
+  judge_ids: Record<string, number>
+) {
+  const entries = Object.entries(scores);
+
+  const ordered: { [key: string]: [string, any][] } = {
+    execution: [],
+    artistry: [],
+    difficulty: [],
+    difficulty_penalization: [], // ✅ separate bucket
+    line_penalization: [],
+    principal_penalization: [],
+  };
+
+  for (const [label, val] of entries) {
+    const lower = label.toLowerCase();
+
+    if (lower.includes("execution")) {
+      ordered.execution.push([label, val]);
+    } else if (lower.includes("artistry")) {
+      ordered.artistry.push([label, val]);
+    } else if (lower.includes("difficulty_penalization")) {
+      // ✅ catch "difficulty_penalization" explicitly
+      ordered.difficulty_penalization.push([label, val]);
+    } else if (lower.includes("difficulty")) {
+      // ✅ plain "difficulty" only
+      ordered.difficulty.push([label, val]);
+    } else if (lower.includes("line")) {
+      ordered.line_penalization.push([label, val]);
+    } else if (lower.includes("principal")) {
+      ordered.principal_penalization.push([label, val]);
+    }
+  }
+
+  return ordered;
+}
+
+
+function inferScoreTypeFromLabel(label: string): string {
+  const lower = label.toLowerCase();
+  if (lower.includes("execution")) return "execution";
+  if (lower.includes("artistry")) return "artistry";
+  if (lower.includes("difficulty penalization"))
+    return "difficulty_penalization"; // ✅
+  if (lower.includes("difficulty")) return "difficulty";
+  if (lower.includes("line")) return "line_penalization";
+  if (lower.includes("principal")) return "principal_penalization";
+  return "other";
+}
+
+// --- component ---
 export default function ViewAllScores() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -130,9 +160,8 @@ export default function ViewAllScores() {
     judge: string;
     judge_id: number;
     value: string;
+    score_type: string;
   } | null>(null);
-
-  const [principalValue, setPrincipalValue] = useState<string>("");
 
   const handleCategoryPress = async (category: string) => {
     setSelectedCategory(category);
@@ -142,73 +171,24 @@ export default function ViewAllScores() {
     setLoading(false);
   };
 
-  const calculateTotal = (scores?: Record<string, number | string>) => {
-    if (!scores) return "N/A";
-    const values = Object.values(scores).filter((s) => typeof s === "number");
-    if (values.length === 0) return "N/A";
-    return (values as number[]).reduce((sum, v) => sum + v, 0).toFixed(2);
-  };
-
   const openDetails = async (c: any) => {
-    try {
-      const scoreData = await fetchCompetitorScores(c.id);
-      setSelectedCompetitor({ ...c, ...scoreData });
-      setModalVisible(true);
-    } catch (err) {
-      Alert.alert("Error", "Could not load competitor scores");
-    }
-  };
-
-  const closeDetails = () => {
-    setModalVisible(false);
-    setSelectedCompetitor(null);
-  };
-
-  const openEditScore = (
-    judge: string,
-    judge_id: number,
-    value: string | number
-  ) => {
-    setEditingJudge({ judge, judge_id, value: String(value ?? "") });
-    setEditModalVisible(true);
+    const scoreData = await fetchCompetitorScores(c.id);
+    setSelectedCompetitor({ ...c, ...scoreData });
+    setModalVisible(true);
   };
 
   const handleSaveScore = async () => {
     if (!selectedCompetitor || !editingJudge) return;
+
     try {
       await submitScore(
         editingJudge.judge_id,
         selectedCompetitor.id,
-        Number(editingJudge.value)
+        Number(editingJudge.value),
+        editingJudge.score_type
       );
+
       Alert.alert("✅ Success", "Score updated");
-
-      setSelectedCompetitor((prev: any) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          scores: {
-            ...prev.scores,
-            [editingJudge.judge]: Number(editingJudge.value),
-          },
-        };
-      });
-
-      setEditModalVisible(false);
-      setEditingJudge(null);
-    } catch (err: any) {
-      Alert.alert("Error", err.message);
-    }
-  };
-
-  const handleSavePrincipal = async () => {
-    if (!selectedCompetitor) return;
-
-    const judgeId = 1; // Principal Judge ID (hardcoded for demo)   TODO
-
-    try {
-      await submitScore(judgeId, selectedCompetitor.id, Number(principalValue));
-      Alert.alert("✅ Success", "Principal Judge score updated");
 
       setSelectedCompetitor((prev: any) =>
         prev
@@ -216,35 +196,19 @@ export default function ViewAllScores() {
               ...prev,
               scores: {
                 ...prev.scores,
-                ["Principal Judge Penalization"]: Number(principalValue),
+                [editingJudge.judge]: Number(editingJudge.value),
               },
             }
           : prev
       );
+
+      setEditModalVisible(false);
+      setEditingJudge(null);
     } catch (err: any) {
-      Alert.alert("Error", err.message);
+      console.error("Failed to update score:", err);
+      Alert.alert("❌ Error", err.message || "Failed to update score");
     }
   };
-
-  // Poll scores every 3s while modal open
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (modalVisible && selectedCompetitor) {
-      interval = setInterval(async () => {
-        try {
-          const updated = await fetchCompetitorScores(selectedCompetitor.id);
-          setSelectedCompetitor((prev: any) =>
-            prev ? { ...prev, ...updated } : prev
-          );
-        } catch (err) {
-          console.error("Error refreshing scores", err);
-        }
-      }, 3000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [modalVisible, selectedCompetitor]);
 
   const filteredCategories = categories.filter((c) =>
     c.toLowerCase().includes(search.toLowerCase())
@@ -252,7 +216,7 @@ export default function ViewAllScores() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Select a Category</Text>
+      <Text style={styles.title}>All Scores</Text>
 
       <TextInput
         style={styles.searchInput}
@@ -282,9 +246,9 @@ export default function ViewAllScores() {
         ))}
       </ScrollView>
 
-      {/* competitors */}
+      {/* competitor list */}
       <ScrollView style={{ flex: 1 }}>
-        {loading && <ActivityIndicator size="large" color="#000" />}
+        {loading && <ActivityIndicator size="large" />}
         {!loading && selectedCategory && competitors.length === 0 && (
           <Text style={styles.noResults}>
             No competitors in {selectedCategory}
@@ -293,149 +257,129 @@ export default function ViewAllScores() {
         {!loading &&
           competitors.map((c) => (
             <View key={c.id} style={styles.competitorCard}>
-              <Text style={styles.competitorName}>
-                {c.name} – {c.club}
-              </Text>
+              <Text style={styles.competitorName}>{c.club}</Text>
+              <Text style={styles.detail}>Category: {c.category}</Text>
 
               <View style={styles.membersBox}>
-                {c.members?.length > 0 ? (
-                  c.members.map((m: any) => (
-                    <Text key={m.id} style={styles.memberText}>
-                      - {m.first_name} {m.last_name} ({m.sex}, {m.age} yrs)
-                    </Text>
-                  ))
-                ) : (
-                  <Text style={styles.memberText}>No members</Text>
-                )}
+                {c.members?.map((m: any) => (
+                  <Text key={m.id} style={styles.memberText}>
+                    - {m.first_name} {m.last_name} ({m.sex}, {m.age} yrs)
+                  </Text>
+                ))}
               </View>
-
-              <Text style={styles.totalScore}>
-                Total Score: {calculateTotal(c.scores)}
-              </Text>
 
               <Pressable
                 style={styles.detailsBtn}
                 onPress={() => openDetails(c)}
               >
-                <Text style={styles.detailsBtnText}>See Details</Text>
+                <Text style={styles.detailsBtnText}>See Scores</Text>
               </Pressable>
             </View>
           ))}
       </ScrollView>
 
-      {/* competitor details modal */}
+      {/* modal for scores */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             {selectedCompetitor && (
               <>
-                <Text style={styles.modalTitle}>{selectedCompetitor.name}</Text>
-                <Text style={styles.modalSubtitle}>
-                  Club: {selectedCompetitor.club}
+                <Text style={styles.modalTitle}>
+                  Scores – {selectedCompetitor.club}
                 </Text>
 
-                <ScrollView style={{ marginVertical: 10 }}>
+                <ScrollView>
                   {(() => {
-                    const groups = groupScores(selectedCompetitor.scores);
+                    const groups = groupScores(
+                      selectedCompetitor.scores,
+                      selectedCompetitor.judge_ids
+                    );
 
                     const renderGroup = (
                       label: string,
                       group: [string, any][],
-                      allowEdit = true
-                    ) => (
-                      <View style={styles.scoreGroup} key={label}>
-                        <Text style={styles.groupTitle}>{label}</Text>
-                        {group.map(([judge, value]) => (
-                          <View key={judge} style={styles.scoreRow}>
-                            <Text style={styles.scoreLine}>
-                              {judge}: {value ?? "N/A"}
-                            </Text>
-                            {allowEdit &&
-                              value !== null &&
-                              value !== undefined && (
+                      editable: boolean
+                    ) => {
+                      const discrepant = hasDiscrepancy(group);
+                      const scoreType = inferScoreTypeFromLabel(label);
+                      return (
+                        <View
+                          style={[
+                            styles.scoreGroup,
+                            discrepant && styles.discrepant,
+                          ]}
+                          key={label}
+                        >
+                          <Text style={styles.groupTitle}>
+                            {label} {discrepant && "⚠️"}
+                          </Text>
+                          {group.map(([judge, value]) => (
+                            <View key={judge} style={styles.scoreRow}>
+                              <Text style={styles.scoreLine}>
+                                {judge}: {value ?? "N/A"}
+                              </Text>
+                              {editable && (
                                 <Pressable
                                   style={styles.editBtn}
-                                  onPress={() =>
-                                    openEditScore(
+                                  onPress={() => {
+                                    setEditingJudge({
                                       judge,
-                                      selectedCompetitor.judge_ids[judge],
-                                      value
-                                    )
-                                  }
+                                      judge_id:
+                                        selectedCompetitor.judge_ids[judge],
+                                      value: String(value ?? ""),
+                                      score_type: scoreType,
+                                    });
+                                    setEditModalVisible(true);
+                                  }}
                                 >
                                   <Text style={styles.editBtnText}>
                                     ✏️ Edit
                                   </Text>
                                 </Pressable>
                               )}
-                          </View>
-                        ))}
-                      </View>
-                    );
+                            </View>
+                          ))}
+                        </View>
+                      );
+                    };
 
                     return (
                       <>
-                        {renderGroup("Execution (4)", groups.execution)}
-                        {renderGroup("Artistry (4)", groups.artistry)}
-                        {renderGroup("Difficulty (2)", groups.difficulty)}
-                        {renderGroup("Line Penalization", groups.line)}
+                        {renderGroup("Execution", groups.execution, true)}
+                        {renderGroup("Artistry", groups.artistry, true)}
+                        {renderGroup("Difficulty", groups.difficulty, true)}
                         {renderGroup(
-                          "Chronometric Penalization",
-                          groups.chrono
+                          "Difficulty Penalization",
+                          groups.difficulty_penalization,
+                          true
                         )}
-
-                        {/* Principal Judge input */}
-                        <View style={styles.scoreGroup}>
-                          <Text style={styles.groupTitle}>
-                            Principal Judge Penalization
-                          </Text>
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                            }}
-                          >
-                            <TextInput
-                              style={[styles.scoreInput, { flex: 1 }]}
-                              keyboardType="numeric"
-                              value={principalValue}
-                              onChangeText={setPrincipalValue}
-                              placeholder="Enter penalty"
-                            />
-                            <Pressable
-                              style={[
-                                styles.closeBtn,
-                                { backgroundColor: "green", marginLeft: 8 },
-                              ]}
-                              onPress={handleSavePrincipal}
-                            >
-                              <Text style={styles.closeBtnText}>Set</Text>
-                            </Pressable>
-                          </View>
-                          <Text style={{ marginTop: 6, color: "#333" }}>
-                            Current:{" "}
-                            {selectedCompetitor.scores?.[
-                              "Principal Judge Penalization"
-                            ] ?? "N/A"}
-                          </Text>
-                        </View>
+                        {renderGroup(
+                          "Line Penalization",
+                          groups.line_penalization,
+                          true
+                        )}
+                        {renderGroup(
+                          "Principal Judge Penalization",
+                          groups.principal_penalization,
+                          true
+                        )}
                       </>
                     );
                   })()}
                 </ScrollView>
-
-                <View style={{ flexDirection: "row", marginTop: 16 }}>
+                {/* footer with Cancel + Validate */}
+                <View style={styles.footerActions}>
                   <Pressable
                     style={[
                       styles.closeBtn,
-                      { backgroundColor: "#777", flex: 1, marginRight: 8 },
+                      { backgroundColor: "gray", flex: 1, marginRight: 8 },
                     ]}
-                    onPress={closeDetails}
+                    onPress={() => setModalVisible(false)}
                   >
-                    <Text style={styles.closeBtnText}>Close</Text>
+                    <Text style={styles.closeBtnText}>Cancel</Text>
                   </Pressable>
 
-                  {allScoresSubmitted(selectedCompetitor?.scores) && (
+                  {allScoresSubmitted(selectedCompetitor.scores) && (
                     <Pressable
                       style={[
                         styles.closeBtn,
@@ -446,11 +390,11 @@ export default function ViewAllScores() {
                           await validateCompetitor(selectedCompetitor.id);
                           Alert.alert(
                             "✅ Validated",
-                            "Total score has been locked."
+                            "Competitor validated successfully!"
                           );
-                          closeDetails();
+                          setModalVisible(false);
                         } catch (err: any) {
-                          Alert.alert("Error", err.message);
+                          Alert.alert("❌ Error", err.message);
                         }
                       }}
                     >
@@ -464,15 +408,13 @@ export default function ViewAllScores() {
         </View>
       </Modal>
 
-      {/* edit score modal */}
+      {/* edit modal */}
       <Modal visible={editModalVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             {editingJudge && (
               <>
                 <Text style={styles.modalTitle}>Edit Score</Text>
-                <Text style={styles.modalSubtitle}>{editingJudge.judge}</Text>
-
                 <TextInput
                   style={styles.scoreInput}
                   keyboardType="numeric"
@@ -484,13 +426,16 @@ export default function ViewAllScores() {
                   }
                 />
 
-                <View style={{ flexDirection: "row", marginTop: 16 }}>
+                <View style={styles.footerActions}>
                   <Pressable
                     style={[
                       styles.closeBtn,
-                      { backgroundColor: "#777", flex: 1, marginRight: 8 },
+                      { backgroundColor: "gray", flex: 1, marginRight: 8 },
                     ]}
-                    onPress={() => setEditModalVisible(false)}
+                    onPress={() => {
+                      setEditModalVisible(false);
+                      setEditingJudge(null);
+                    }}
                   >
                     <Text style={styles.closeBtnText}>Cancel</Text>
                   </Pressable>
@@ -498,36 +443,12 @@ export default function ViewAllScores() {
                   <Pressable
                     style={[
                       styles.closeBtn,
-                      { backgroundColor: "green", flex: 1, marginRight: 8 },
+                      { backgroundColor: "green", flex: 1 },
                     ]}
                     onPress={handleSaveScore}
                   >
                     <Text style={styles.closeBtnText}>Save</Text>
                   </Pressable>
-
-                  {allScoresSubmitted(selectedCompetitor?.scores) && (
-                    <Pressable
-                      style={[
-                        styles.closeBtn,
-                        { backgroundColor: "purple", flex: 1 },
-                      ]}
-                      onPress={async () => {
-                        try {
-                          await validateCompetitor(selectedCompetitor.id);
-                          Alert.alert(
-                            "✅ Validated",
-                            "Total score has been locked."
-                          );
-                          setEditModalVisible(false);
-                          closeDetails();
-                        } catch (err: any) {
-                          Alert.alert("Error", err.message);
-                        }
-                      }}
-                    >
-                      <Text style={styles.closeBtnText}>Validate</Text>
-                    </Pressable>
-                  )}
                 </View>
               </>
             )}
@@ -580,7 +501,7 @@ const styles = StyleSheet.create({
     borderColor: "#eee",
   },
   competitorName: { fontSize: 18, fontWeight: "600", marginBottom: 4 },
-  totalScore: { fontSize: 16, marginBottom: 8 },
+  detail: { fontSize: 14, color: "#555", marginBottom: 6 },
   membersBox: { marginVertical: 6, paddingLeft: 8 },
   memberText: { fontSize: 14, color: "#444" },
   noResults: {
@@ -616,8 +537,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: "center",
   },
-  modalSubtitle: { fontSize: 16, marginBottom: 4, textAlign: "center" },
-  closeBtn: { padding: 10, borderRadius: 8, alignItems: "center" },
+  closeBtn: {
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 16,
+  },
   closeBtnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   scoreInput: {
     borderWidth: 1,
@@ -642,6 +567,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     backgroundColor: "#e6f7ff",
     borderRadius: 6,
+    marginLeft: 4,
   },
   editBtnText: { fontSize: 14, color: "#0077cc" },
   scoreGroup: {
@@ -655,5 +581,17 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 6,
     color: "#444",
+  },
+  discrepant: {
+    backgroundColor: "#ffe6e6",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "red",
+    padding: 6,
+  },
+  footerActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
   },
 });

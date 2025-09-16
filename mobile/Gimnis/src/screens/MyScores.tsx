@@ -1,3 +1,4 @@
+// src/screens/MyScores.tsx
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -22,13 +23,14 @@ type Member = {
 type Score = {
   id: number;
   competitor_id: number;
-  competitor_name: string; // team name
   category: string;
   club: string;
+  score_type: string;
   value: number | null;
   members: Member[];
 };
 
+// 🔖 categories for filtering
 const categories = [
   "IF-AG",
   "TR-7-8",
@@ -58,7 +60,7 @@ export default function MyScores() {
   const [scores, setScores] = useState<Score[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // TODO: Replace with logged-in judge ID
+  // TODO: Replace with logged-in judge ID from session/auth
   const judgeId = 2;
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function MyScores() {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || "Failed to fetch scores");
 
-        setAllScores(data); // API should return members[]
+        setAllScores(data);
       } catch (err: any) {
         console.error("Error fetching scores:", err);
         setAllScores([]);
@@ -135,12 +137,15 @@ export default function MyScores() {
         {!loading &&
           scores.map((s) => (
             <View key={s.id} style={styles.scoreCard}>
-              <Text style={styles.competitorName}>{s.competitor_name}</Text>
               <Text style={styles.detail}>
-                {s.category} • {s.club}
+                <Text style={{ fontWeight: "600" }}>Category:</Text>{" "}
+                {s.category}
+              </Text>
+              <Text style={styles.detail}>
+                <Text style={{ fontWeight: "600" }}>Club:</Text> {s.club}
               </Text>
 
-              {/* Members */}
+              {/* 👥 Members */}
               <View style={styles.membersBox}>
                 {s.members.map((m) => (
                   <Text key={m.id} style={styles.memberText}>
@@ -149,8 +154,9 @@ export default function MyScores() {
                 ))}
               </View>
 
+              {/* 🎯 Score */}
               <Text style={styles.scoreLine}>
-                Score: {s.value !== null ? s.value : "N/A"}
+                {s.score_type}: {s.value !== null ? s.value : "N/A"}
               </Text>
             </View>
           ))}
@@ -201,11 +207,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#eee",
   },
-  competitorName: { fontSize: 18, fontWeight: "600", marginBottom: 4 },
-  detail: { fontSize: 14, color: "#555", marginBottom: 6 },
+  detail: { fontSize: 14, color: "#555", marginBottom: 4 },
   membersBox: { marginBottom: 6, paddingLeft: 8 },
   memberText: { fontSize: 14, color: "#333" },
-  scoreLine: { fontSize: 16, fontWeight: "600" },
+  scoreLine: { fontSize: 16, fontWeight: "600", marginTop: 4 },
   noResults: {
     marginTop: 20,
     fontSize: 16,

@@ -22,7 +22,6 @@ type CompetitorMember = {
 
 type Competitor = {
   id: number;
-  name: string;
   category: string;
   club: string;
   members: CompetitorMember[];
@@ -30,7 +29,6 @@ type Competitor = {
 
 type CurrentCompetitor = {
   competitor_id: number;
-  name: string;
   category: string;
   club: string;
   already_voted: boolean;
@@ -184,7 +182,6 @@ export default function Competitors() {
       {currentCompetitor ? (
         <View style={styles.currentBox}>
           <Text style={styles.currentTitle}>Current Competitor</Text>
-          <Text style={styles.currentName}>{currentCompetitor.name}</Text>
           <Text style={styles.currentDetail}>
             {currentCompetitor.category} – {currentCompetitor.club}
           </Text>
@@ -260,9 +257,13 @@ export default function Competitors() {
         {!loading &&
           competitors.map((c) => (
             <View key={c.id} style={styles.competitorCard}>
-              <Text style={styles.competitorName}>{c.name}</Text>
-              <Text style={styles.detail}>Club: {c.club}</Text>
-              <Text style={styles.detail}>Category: {c.category}</Text>
+              <Text style={styles.detail}>
+                <Text style={{ fontWeight: "600" }}>Club:</Text> {c.club}
+              </Text>
+              <Text style={styles.detail}>
+                <Text style={{ fontWeight: "600" }}>Category:</Text>{" "}
+                {c.category}
+              </Text>
 
               {/* 👥 Members list */}
               <Text style={{ fontWeight: "600", marginTop: 6 }}>Members:</Text>
@@ -283,7 +284,7 @@ export default function Competitors() {
                 <Pressable
                   style={[styles.actionBtn, { backgroundColor: "crimson" }]}
                   onPress={() =>
-                    Alert.alert("Confirm", `Delete ${c.name}?`, [
+                    Alert.alert("Confirm", `Delete competitor #${c.id}?`, [
                       { text: "Cancel", style: "cancel" },
                       {
                         text: "Delete",
@@ -342,7 +343,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   currentTitle: { fontSize: 20, fontWeight: "700", marginBottom: 6 },
-  currentName: { fontSize: 20, fontWeight: "600" },
   currentDetail: { fontSize: 16, color: "#555", marginBottom: 12 },
   stopBtn: {
     paddingVertical: 14,
@@ -391,7 +391,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#eee",
   },
-  competitorName: { fontSize: 18, fontWeight: "600", marginBottom: 4 },
   detail: { fontSize: 14, color: "#555" },
   membersBox: {
     marginVertical: 8,

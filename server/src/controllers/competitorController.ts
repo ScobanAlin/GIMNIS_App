@@ -7,13 +7,13 @@ import {
 } from "../models/competitorModel";
 
 export const createCompetitor = async (req: Request, res: Response) => {
-  const { name, category, club, members } = req.body;
-  if (!name || !category || !club || !Array.isArray(members)) {
+  const { category, club, members } = req.body;
+  if (!category || !club || !Array.isArray(members)) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
-    const newCompetitor = await insertCompetitor(name, category, club, members);
+    const newCompetitor = await insertCompetitor( category, club, members);
     res.status(201).json(newCompetitor);
   } catch (err: any) {
     console.error("Error creating competitor:", err);
