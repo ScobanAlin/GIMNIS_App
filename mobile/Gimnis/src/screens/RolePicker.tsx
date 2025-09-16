@@ -21,7 +21,7 @@ export default function RolePicker() {
 
       <Pressable
         style={styles.btn}
-        onPress={() => navigation.navigate("JudgeMenu")}
+        onPress={() => navigation.navigate("JudgePicker")}
       >
         <Text style={styles.btnText}>⚖️ Judge</Text>
       </Pressable>

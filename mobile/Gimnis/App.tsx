@@ -12,7 +12,7 @@ import Competitors from "./src/screens/Competitors";
 import PrincipalJudgeMenu from "./src/screens/PrincipalJudgeMenu";
 import MyScores from "./src/screens/MyScores";
 import ViewAllScores from "./src/screens/ViewAllScores";
-
+import JudgePicker from "./src/screens/JudgePicker";
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
@@ -30,6 +30,8 @@ export default function App() {
           component={SecretaryMenu}
           options={{ title: "Secretary Menu" }}
         />
+        <Stack.Screen name="JudgePicker" component={JudgePicker} />
+
         <Stack.Screen
           name="JudgeMenu"
           component={JudgeMenu}

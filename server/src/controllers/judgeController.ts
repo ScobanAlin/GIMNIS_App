@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { fetchJudgeScores, fetchAllScores } from "../models/judgeModel";
+import { fetchJudgeScores, fetchAllScores , fetchAllJudges} from "../models/judgeModel";
 
 // 📝 Get scores given by a specific judge
 export const getJudgeScores = async (req: Request, res: Response) => {
@@ -27,5 +27,15 @@ export const getAllScores = async (_req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error fetching all scores:", error);
     res.status(500).json({ error: "Failed to fetch all scores" });
+  }
+};
+
+export const getAllJudges = async (_req: Request, res: Response) => {
+  try {
+    const judges = await fetchAllJudges();
+    res.json(judges);
+  } catch (error: any) {
+    console.error("Error fetching all judges:", error);
+    res.status(500).json({ error: "Failed to fetch all judges" });
   }
 };

@@ -11,7 +11,7 @@ import {
   View,
   FlatList,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../App";
 import { BASE_URL } from "../config";
@@ -32,14 +32,25 @@ type CurrentCompetitor = {
   members: Member[];
 } | null;
 
-// mock: this would come from logged-in user/session
-const judgeId = 2;
-const judgeRole: "execution" | "artistry" | "difficulty" | "principal" =
-  "execution"; // replace with actual role from API/session
+type JudgeMenuRouteParams = {
+  judgeId: number;
+  role: "execution" | "artistry" | "difficulty" | "principal" | string;
+  name: string;
+};
 
 export default function JudgeMenu() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute();
+  const {
+    judgeId,
+    role: judgeRole,
+    name,
+  } = (route.params as JudgeMenuRouteParams) || {
+    judgeId: 0,
+    role: "unknown",
+    name: "Unknown",
+  };
 
   const [loading, setLoading] = useState(true);
   const [currentCompetitor, setCurrentCompetitor] =
@@ -51,36 +62,79 @@ export default function JudgeMenu() {
       const res = await fetch(
         `${BASE_URL}/api/votes/current?judge_id=${judgeId}`
       );
-      const data = await res.json();
+      const text = await res.text();
 
-      if (res.ok && data && data.competitor_id) {
-        if (data.already_voted) {
-          setCurrentCompetitor(null);
-        } else {
-          setCurrentCompetitor(data);
-        }
+      if (!res.ok) throw new Error(`Failed (${res.status})`);
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error("Invalid server response");
+      }
+
+      if (data && data.competitor_id) {
+        setCurrentCompetitor(data.already_voted ? null : data);
       } else {
         setCurrentCompetitor(null);
       }
     } catch (err) {
-      console.error("Error fetching current competitor:", err);
+      console.error("Error fetching competitor:", err);
       setCurrentCompetitor(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleScoreChange = (type: string, value: string) => {
-    setScores((prev) => ({ ...prev, [type]: value }));
-  };
+const handleScoreChange = (type: string, value: string) => {
+  // Allow only digits and dot
+  let sanitized = value.replace(/[^0-9.]/g, "");
 
+  // Prevent multiple dots
+  const parts = sanitized.split(".");
+  if (parts.length > 2) {
+    sanitized = parts[0] + "." + parts[1];
+  }
+
+  // Only 1 decimal place
+  if (parts[1]?.length > 1) {
+    sanitized = parts[0] + "." + parts[1].slice(0, 1);
+  }
+
+  // Remove leading zero if not "0."
+  if (/^0[0-9]/.test(sanitized)) {
+    sanitized = sanitized.replace(/^0+/, "");
+  }
+  if (sanitized.startsWith(".")) {
+    sanitized = "0" + sanitized; // ".5" -> "0.5"
+  }
+
+  // Block numbers > 10 except "10"
+  if (/^(1[1-9]|[2-9][0-9])$/.test(sanitized)) {
+    sanitized = sanitized[0];
+  }
+
+  // If ends with "." → allow typing (skip parseFloat)
+  if (sanitized.endsWith(".")) {
+    setScores((prev) => ({ ...prev, [type]: sanitized }));
+    return;
+  }
+
+  // Clamp at 10 if parsed
+  let num = parseFloat(sanitized);
+  if (!isNaN(num)) {
+    if (num > 10) num = 10;
+    sanitized = num.toString();
+  }
+
+  setScores((prev) => ({ ...prev, [type]: sanitized }));
+};
   const confirmVote = () => {
     if (!currentCompetitor) return;
 
     const filledScores = Object.entries(scores).filter(
       ([, v]) => v && !isNaN(Number(v))
     );
-
     if (filledScores.length === 0) {
       Alert.alert("Error", "Please enter at least one valid score.");
       return;
@@ -88,7 +142,7 @@ export default function JudgeMenu() {
 
     Alert.alert(
       "Confirm Vote",
-      `Submit your scores for competitor ${currentCompetitor.category} - ${currentCompetitor.club}?`,
+      `Submit your scores for ${currentCompetitor.category} – ${currentCompetitor.club}?`,
       [
         { text: "Cancel", style: "cancel" },
         { text: "Submit", style: "destructive", onPress: voteCompetitor },
@@ -102,12 +156,27 @@ export default function JudgeMenu() {
     try {
       const payloads = Object.entries(scores)
         .filter(([, v]) => v && !isNaN(Number(v)))
-        .map(([score_type, value]) => ({
-          competitor_id: currentCompetitor.competitor_id,
-          judge_id: judgeId,
-          value: parseFloat(value),
-          score_type,
-        }));
+        .map(([score_type, value]) => {
+          let finalValue = parseFloat(value);
+
+          // ✅ execution judge: penalization → 10 - value
+          if (score_type === "execution_penalization") {
+            return {
+              competitor_id: currentCompetitor.competitor_id,
+              judge_id: judgeId,
+              score_type: "execution",
+              value: 10 - finalValue,
+            };
+          }
+
+          // ✅ others: send raw
+          return {
+            competitor_id: currentCompetitor.competitor_id,
+            judge_id: judgeId,
+            score_type,
+            value: finalValue,
+          };
+        });
 
       for (const p of payloads) {
         const res = await fetch(`${BASE_URL}/api/scores`, {
@@ -123,7 +192,7 @@ export default function JudgeMenu() {
       setScores({});
       fetchCurrentCompetitor();
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Could not submit score(s)");
+      Alert.alert("❌ Error", err.message || "Could not submit score(s)");
     }
   };
 
@@ -174,6 +243,21 @@ export default function JudgeMenu() {
           />
         </>
       );
+    } else if (judgeRole === "execution") {
+      const penal = parseFloat(scores["execution_penalization"] || "0");
+      const preview = !isNaN(penal) ? (10 - penal).toFixed(2) : "N/A";
+      return (
+        <View style={{ width: "100%", alignItems: "center" }}>
+          <TextInput
+            style={styles.input}
+            placeholder="Execution penalization"
+            keyboardType="numeric"
+            value={scores["execution_penalization"] || ""}
+            onChangeText={(t) => handleScoreChange("execution_penalization", t)}
+          />
+          <Text style={styles.previewText}>Final Score: {preview}</Text>
+        </View>
+      );
     } else {
       return (
         <TextInput
@@ -189,11 +273,19 @@ export default function JudgeMenu() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Judge Menu ({judgeRole})</Text>
+      <Text style={styles.title}>
+        Judge Menu ({judgeRole}) – {name}
+      </Text>
 
       <Pressable
         style={[styles.btn, styles.myScoresBtn]}
-        onPress={() => navigation.navigate("MyScores")}
+        onPress={() =>
+          navigation.navigate("MyScores", {
+            judgeId,
+            role: judgeRole,
+            name,
+          })
+        }
       >
         <Text style={styles.btnText}>📊 View My Scores</Text>
       </Pressable>
@@ -211,7 +303,6 @@ export default function JudgeMenu() {
             {currentCompetitor.category} • {currentCompetitor.club}
           </Text>
 
-          {/* 👥 Members list */}
           <FlatList
             data={currentCompetitor.members}
             keyExtractor={(m) => m.id.toString()}
@@ -223,7 +314,6 @@ export default function JudgeMenu() {
             )}
           />
 
-          {/* 🎯 Score inputs */}
           {renderScoreInputs()}
 
           <Pressable style={[styles.btn, styles.voteBtn]} onPress={confirmVote}>
@@ -252,6 +342,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 20,
     marginTop: 10,
+    textAlign: "center",
   },
   card: {
     width: "100%",
@@ -283,13 +374,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   btnText: { fontSize: 17, fontWeight: "600", color: "#fff" },
-  myScoresBtn: {
-    backgroundColor: "#0077cc",
-  },
-  voteBtn: {
-    backgroundColor: "green",
-    marginTop: 10,
-  },
+  myScoresBtn: { backgroundColor: "#0077cc" },
+  voteBtn: { backgroundColor: "green", marginTop: 10 },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -300,5 +386,11 @@ const styles = StyleSheet.create({
     marginVertical: 12,
     textAlign: "center",
     backgroundColor: "#f9f9f9",
+  },
+  previewText: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#444",
   },
 });

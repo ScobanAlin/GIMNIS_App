@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { getJudgeScores, getAllScores } from "../controllers/judgeController";
+import { getJudgeScores, getAllScores , getAllJudges} from "../controllers/judgeController";
+import { get } from "http";
 
 const router = Router();
 
@@ -8,5 +9,5 @@ router.get("/judges/:id/scores", getJudgeScores);
 
 // Get all scores (all judges, all competitors)
 router.get("/scores", getAllScores);
-
+router.get("/judges", getAllJudges);
 export default router;

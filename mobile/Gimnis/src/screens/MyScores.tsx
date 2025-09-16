@@ -9,8 +9,11 @@ import {
   Pressable,
   ActivityIndicator,
   StyleSheet,
+  Alert,
 } from "react-native";
+import { useRoute, RouteProp } from "@react-navigation/native";
 import { BASE_URL } from "../config";
+import type { RootStackParamList } from "../../App";
 
 type Member = {
   id: number;
@@ -30,7 +33,6 @@ type Score = {
   members: Member[];
 };
 
-// 🔖 categories for filtering
 const categories = [
   "IF-AG",
   "TR-7-8",
@@ -54,14 +56,14 @@ const categories = [
 ];
 
 export default function MyScores() {
+  const route = useRoute<RouteProp<RootStackParamList, "MyScores">>();
+  const { judgeId, role, name } = route.params; // ✅ from navigation
+
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [allScores, setAllScores] = useState<Score[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [loading, setLoading] = useState(false);
-
-  // TODO: Replace with logged-in judge ID from session/auth
-  const judgeId = 2;
 
   useEffect(() => {
     const fetchScores = async () => {
@@ -74,6 +76,7 @@ export default function MyScores() {
         setAllScores(data);
       } catch (err: any) {
         console.error("Error fetching scores:", err);
+        Alert.alert("❌ Error", err.message || "Failed to fetch scores");
         setAllScores([]);
       } finally {
         setLoading(false);
@@ -81,7 +84,7 @@ export default function MyScores() {
     };
 
     fetchScores();
-  }, []);
+  }, [judgeId]);
 
   const handleCategoryPress = (cat: string) => {
     setSelectedCategory(cat);
@@ -95,7 +98,9 @@ export default function MyScores() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>My Scores</Text>
+      <Text style={styles.title}>
+        My Scores – {name} ({role})
+      </Text>
 
       {/* 🔍 Search bar */}
       <View style={styles.searchContainer}>

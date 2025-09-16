@@ -50,3 +50,19 @@ export const fetchAllScores = async () => {
   const result = await db.query(query);
   return result.rows;
 };
+
+export const fetchAllJudges = async () => {
+  const query = `
+    SELECT 
+      id,
+      first_name,
+      last_name,
+      role
+    FROM judges
+    WHERE role != 'principal'
+    ORDER BY role, last_name, first_name;
+  `;
+  const result = await
+    db.query(query);
+  return result.rows;
+}
