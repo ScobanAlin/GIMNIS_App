@@ -13,6 +13,7 @@ export default function SecretaryMenu() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <View style={styles.container}>
+        <Text style={styles.title}>Secretary Menu</Text>
         <Pressable
           style={styles.btn}
           onPress={() => navigation.navigate("AddCompetitor")}
@@ -31,8 +32,32 @@ export default function SecretaryMenu() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, gap: 12, justifyContent: "center" },
-  title: { fontSize: 24, fontWeight: "700", marginBottom: 12, textAlign: "center" },
-  btn: { padding: 14, borderRadius: 10, borderWidth: 1, borderColor: "#ddd", backgroundColor: "#f7f7f7" },
-  btnText: { fontSize: 18, textAlign: "center" },
+  container: {
+    flex: 1,
+    padding: 16,
+    gap: 12,
+    justifyContent: "center",
+    alignItems: "center", // keep buttons centered
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  btn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    backgroundColor: "#f7f7f7",
+    minWidth: 220, // smaller than 220, keeps consistency
+    alignItems: "center",
+  },
+  btnText: {
+    fontSize: 16,
+    textAlign: "center",
+  },
 });
+

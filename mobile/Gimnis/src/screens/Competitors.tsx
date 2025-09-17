@@ -38,25 +38,43 @@ type CurrentCompetitor = {
 } | null;
 
 const categories = [
-  "IF-AG",
-  "TR-7-8",
-  "IM-AG",
-  "MP-ND",
-  "IF-7-8",
-  "TRIO-ND",
-  "MP-7-8",
-  "IF-JUNIORI",
-  "IM-JUNIORI",
-  "IF-ND",
-  "IM-7-8",
-  "IM-ND",
-  "GRUP-AG",
-  "GRUP-JUNIORI",
-  "TRIO-AG",
-  "TRIO-JUNIORS",
-  "GRUP-7-8",
-  "GRUP-ND",
-  "AD-JUNIORI",
+  // Kids Development (7-8 ani)
+  "Individual Men - Kids Development",
+  "Individual Women - Kids Development",
+  "Mixed Pair - Kids Development",
+  "Trio - Kids Development",
+  "Group - Kids Development",
+
+  // National Development (9-11 ani)
+  "Individual Men - National Development",
+  "Individual Women - National Development",
+  "Mixed Pair - National Development",
+  "Trio - National Development",
+  "Group - National Development",
+
+  // Youth (12-14 ani)
+  "Individual Men - Youth",
+  "Individual Women - Youth",
+  "Mixed Pair - Youth",
+  "Trio - Youth",
+  "Group - Youth",
+  "Aerobic Dance - Youth",
+
+  // Juniors (15-17 ani)
+  "Individual Men - Juniors",
+  "Individual Women - Juniors",
+  "Mixed Pair - Juniors",
+  "Trio - Juniors",
+  "Group - Juniors",
+  "Aerobic Dance - Juniors",
+
+  // Seniors (18+)
+  "Individual Men - Seniors",
+  "Individual Women - Seniors",
+  "Mixed Pair - Seniors",
+  "Trio - Seniors",
+  "Group - Seniors",
+  "Aerobic Dance - Seniors",
 ];
 
 export default function Competitors() {

@@ -37,25 +37,43 @@ type CompetitorPayload = {
 };
 
 const CATEGORIES = [
-  "IF-AG",
-  "TR-7-8",
-  "IM-AG",
-  "MP-ND",
-  "IF-7-8",
-  "TRIO-ND",
-  "MP-7-8",
-  "IF-JUNIORI",
-  "IM-JUNIORI",
-  "IF-ND",
-  "IM-7-8",
-  "IM-ND",
-  "GRUP-AG",
-  "GRUP-JUNIORI",
-  "TRIO-AG",
-  "TRIO-JUNIORS",
-  "GRUP-7-8",
-  "GRUP-ND",
-  "AD-JUNIORI",
+  // Kids Development (7-8 ani)
+  "Individual Men - Kids Development",
+  "Individual Women - Kids Development",
+  "Mixed Pair - Kids Development",
+  "Trio - Kids Development",
+  "Group - Kids Development",
+
+  // National Development (9-11 ani)
+  "Individual Men - National Development",
+  "Individual Women - National Development",
+  "Mixed Pair - National Development",
+  "Trio - National Development",
+  "Group - National Development",
+
+  // Youth (12-14 ani)
+  "Individual Men - Youth",
+  "Individual Women - Youth",
+  "Mixed Pair - Youth",
+  "Trio - Youth",
+  "Group - Youth",
+  "Aerobic Dance - Youth",
+
+  // Juniors (15-17 ani)
+  "Individual Men - Juniors",
+  "Individual Women - Juniors",
+  "Mixed Pair - Juniors",
+  "Trio - Juniors",
+  "Group - Juniors",
+  "Aerobic Dance - Juniors",
+
+  // Seniors (18+)
+  "Individual Men - Seniors",
+  "Individual Women - Seniors",
+  "Mixed Pair - Seniors",
+  "Trio - Seniors",
+  "Group - Seniors",
+  "Aerobic Dance - Seniors",
 ];
 
 export default function AddCompetitor() {
@@ -70,31 +88,66 @@ export default function AddCompetitor() {
   useEffect(() => {
     if (!category) return;
 
-    if (category.startsWith("TRIO")) {
-      setMembers([
-        { first_name: "", last_name: "", email: "", age: "", sex: "F" },
-        { first_name: "", last_name: "", email: "", age: "", sex: "F" },
-        { first_name: "", last_name: "", email: "", age: "", sex: "F" },
-      ]);
-    } else if (category.startsWith("IF")) {
-      setMembers([
-        { first_name: "", last_name: "", email: "", age: "", sex: "F" },
-      ]);
-    } else if (category.startsWith("IM")) {
+    if (category.startsWith("Individual Men")) {
       setMembers([
         { first_name: "", last_name: "", email: "", age: "", sex: "M" },
       ]);
-    } else if (category.startsWith("MP")) {
+    } else if (category.startsWith("Individual Women")) {
       setMembers([
         { first_name: "", last_name: "", email: "", age: "", sex: "F" },
-        { first_name: "", last_name: "", email: "", age: "", sex: "M" },
       ]);
+    } else if (category.startsWith("Mixed Pair")) {
+      setMembers([
+        { first_name: "", last_name: "", email: "", age: "", sex: "M" },
+        { first_name: "", last_name: "", email: "", age: "", sex: "F" },
+      ]);
+    } else if (category.startsWith("Trio")) {
+      setMembers([
+        { first_name: "", last_name: "", email: "", age: "", sex: "" },
+        { first_name: "", last_name: "", email: "", age: "", sex: "" },
+        { first_name: "", last_name: "", email: "", age: "", sex: "" },
+      ]);
+    } else if (category.startsWith("Group")) {
+      setMembers([
+        { first_name: "", last_name: "", email: "", age: "", sex: "" },
+        { first_name: "", last_name: "", email: "", age: "", sex: "" },
+        { first_name: "", last_name: "", email: "", age: "", sex: "" },
+        { first_name: "", last_name: "", email: "", age: "", sex: "" },
+        { first_name: "", last_name: "", email: "", age: "", sex: "" },
+      ]);
+    } else if (category.startsWith("Aerobic Dance")) {
+      // Default with 6, but user can add up to 8
+      setMembers(
+        Array.from({ length: 6 }, () => ({
+          first_name: "",
+          last_name: "",
+          email: "",
+          age: "",
+          sex: "",
+        }))
+      );
     } else {
       setMembers([
         { first_name: "", last_name: "", email: "", age: "", sex: "" },
       ]);
     }
   }, [category]);
+
+const addMember = () => {
+  if (category.startsWith("Aerobic Dance") && members.length < 8) {
+    setMembers([
+      ...members,
+      { first_name: "", last_name: "", email: "", age: "", sex: "" },
+    ]);
+  }
+};
+
+const removeMember = (index: number) => {
+  if (category.startsWith("Aerobic Dance") && members.length <= 6) return; // cannot go below 6
+  const updated = [...members];
+  updated.splice(index, 1);
+  setMembers(updated);
+};
 
   const updateMember = (index: number, field: keyof Member, value: string) => {
     const updated = [...members];
@@ -202,6 +255,8 @@ export default function AddCompetitor() {
         <Text style={styles.subtitle}>Members</Text>
         {members.map((m, idx) => (
           <View key={idx} style={styles.memberBox}>
+            <Text style={styles.memberTitle}>Member #{idx + 1}</Text>
+
             <TextInput
               style={styles.input}
               placeholder="First name"
@@ -244,8 +299,26 @@ export default function AddCompetitor() {
                 <Text style={styles.radioText}>Female</Text>
               </Pressable>
             </View>
+
+            {/* Only show remove button for Aerobic Dance AND when member #7 or #8 */}
+            {category.startsWith("Aerobic Dance") &&
+              (idx + 1 === 7 || idx + 1 === 8) && (
+                <Pressable
+                  style={styles.removeBtn}
+                  onPress={() => removeMember(idx)}
+                >
+                  <Text style={styles.removeText}>➖ Remove</Text>
+                </Pressable>
+              )}
           </View>
         ))}
+
+        {/* Show add button only for Aerobic Dance and if < 8 */}
+        {category.startsWith("Aerobic Dance") && members.length < 8 && (
+          <Pressable style={styles.addBtn} onPress={addMember}>
+            <Text style={styles.addText}>➕ Add Member</Text>
+          </Pressable>
+        )}
 
         {loading ? (
           <ActivityIndicator size="large" />
@@ -284,6 +357,28 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: "#f9f9f9",
   },
+  memberTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+
+  addBtn: {
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "#28a745",
+    alignItems: "center",
+    marginVertical: 8,
+  },
+  addText: { color: "#fff", fontWeight: "600" },
+  removeBtn: {
+    marginTop: 8,
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: "#dc3545",
+    alignItems: "center",
+  },
+  removeText: { color: "#fff", fontWeight: "600" },
   radioRow: { flexDirection: "row", gap: 10, marginTop: 6 },
   radioBtn: {
     padding: 8,

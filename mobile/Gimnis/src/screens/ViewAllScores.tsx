@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   Text,
@@ -14,25 +14,43 @@ import {
 import { BASE_URL } from "../config";
 
 const categories = [
-  "IF-AG",
-  "TR-7-8",
-  "IM-AG",
-  "MP-ND",
-  "IF-7-8",
-  "TRIO-ND",
-  "MP-7-8",
-  "IF-JUNIORI",
-  "IM-JUNIORI",
-  "IF-ND",
-  "IM-7-8",
-  "IM-ND",
-  "GRUP-AG",
-  "GRUP-JUNIORI",
-  "TRIO-AG",
-  "TRIO-JUNIORS",
-  "GRUP-7-8",
-  "GRUP-ND",
-  "AD-JUNIORI",
+  // Kids Development (7-8 ani)
+  "Individual Men - Kids Development",
+  "Individual Women - Kids Development",
+  "Mixed Pair - Kids Development",
+  "Trio - Kids Development",
+  "Group - Kids Development",
+
+  // National Development (9-11 ani)
+  "Individual Men - National Development",
+  "Individual Women - National Development",
+  "Mixed Pair - National Development",
+  "Trio - National Development",
+  "Group - National Development",
+
+  // Youth (12-14 ani)
+  "Individual Men - Youth",
+  "Individual Women - Youth",
+  "Mixed Pair - Youth",
+  "Trio - Youth",
+  "Group - Youth",
+  "Aerobic Dance - Youth",
+
+  // Juniors (15-17 ani)
+  "Individual Men - Juniors",
+  "Individual Women - Juniors",
+  "Mixed Pair - Juniors",
+  "Trio - Juniors",
+  "Group - Juniors",
+  "Aerobic Dance - Juniors",
+
+  // Seniors (18+)
+  "Individual Men - Seniors",
+  "Individual Women - Seniors",
+  "Mixed Pair - Seniors",
+  "Trio - Seniors",
+  "Group - Seniors",
+  "Aerobic Dance - Seniors",
 ];
 
 // --- API helpers ---
@@ -182,29 +200,54 @@ export default function ViewAllScores() {
     score_type: string;
   } | null>(null);
 
-const [scores, setScores] = useState<Record<string, string>>({});
+  const [scores, setScores] = useState<Record<string, string>>({});
 
-// --- input sanitizer ---
-const handleScoreChange = (type: string, value: string) => {
-  let sanitized = value.replace(/[^0-9.]/g, "");
-  const parts = sanitized.split(".");
-  if (parts.length > 2) sanitized = parts[0] + "." + parts[1];
-  if (parts[1]?.length > 1) sanitized = parts[0] + "." + parts[1].slice(0, 1);
-  if (/^0[0-9]/.test(sanitized)) sanitized = sanitized.replace(/^0+/, "");
-  if (sanitized.startsWith(".")) sanitized = "0" + sanitized;
-  if (/^(1[1-9]|[2-9][0-9])$/.test(sanitized)) sanitized = sanitized[0];
-  if (sanitized.endsWith(".")) {
+  // 🆕 Current competitor state
+  const [currentCompetitor, setCurrentCompetitor] = useState<any | null>(null);
+
+  // --- fetch current competitor ---
+  const fetchCurrentCompetitor = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/votes/current`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.competitor_id) {
+        setCurrentCompetitor(data);
+      } else {
+        setCurrentCompetitor(null);
+      }
+    } catch (err) {
+      console.error("Error fetching current competitor:", err);
+      setCurrentCompetitor(null);
+    }
+  };
+
+useEffect(() => {
+  fetchCurrentCompetitor();
+  const interval = setInterval(fetchCurrentCompetitor, 5000);
+  return () => clearInterval(interval);
+}, []);
+
+  // --- input sanitizer ---
+  const handleScoreChange = (type: string, value: string) => {
+    let sanitized = value.replace(/[^0-9.]/g, "");
+    const parts = sanitized.split(".");
+    if (parts.length > 2) sanitized = parts[0] + "." + parts[1];
+    if (parts[1]?.length > 1) sanitized = parts[0] + "." + parts[1].slice(0, 1);
+    if (/^0[0-9]/.test(sanitized)) sanitized = sanitized.replace(/^0+/, "");
+    if (sanitized.startsWith(".")) sanitized = "0" + sanitized;
+    if (/^(1[1-9]|[2-9][0-9])$/.test(sanitized)) sanitized = sanitized[0];
+    if (sanitized.endsWith(".")) {
+      setScores((prev) => ({ ...prev, [type]: sanitized }));
+      return;
+    }
+    let num = parseFloat(sanitized);
+    if (!isNaN(num)) {
+      if (num > 10) num = 10;
+      sanitized = num.toString();
+    }
     setScores((prev) => ({ ...prev, [type]: sanitized }));
-    return;
-  }
-  let num = parseFloat(sanitized);
-  if (!isNaN(num)) {
-    if (num > 10) num = 10;
-    sanitized = num.toString();
-  }
-  setScores((prev) => ({ ...prev, [type]: sanitized }));
-};
-
+  };
 
   const handleCategoryPress = async (category: string) => {
     setSelectedCategory(category);
@@ -215,8 +258,11 @@ const handleScoreChange = (type: string, value: string) => {
   };
 
   const openDetails = async (c: any) => {
-    const scoreData = await fetchCompetitorScores(c.id);
-    setSelectedCompetitor({ ...c, ...scoreData });
+    const competitorId = c.id ?? c.competitor_id; // support both shapes
+    if (!competitorId) return;
+
+    const scoreData = await fetchCompetitorScores(competitorId);
+    setSelectedCompetitor({ ...c, ...scoreData, id: competitorId }); // ensure id exists
     setModalVisible(true);
   };
 
@@ -260,6 +306,28 @@ const handleScoreChange = (type: string, value: string) => {
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>All Scores</Text>
+
+      {/* 🆕 Current Competitor Card */}
+      {currentCompetitor && (
+        <View style={styles.currentCard}>
+          <Text style={styles.cardTitle}>Current Competitor</Text>
+          <Text style={styles.competitorName}>
+            {currentCompetitor.members
+              ?.map((m: any) => `${m.first_name} ${m.last_name}`)
+              .join(", ")}
+          </Text>
+          <Text style={styles.detail}>
+            {currentCompetitor.category} • {currentCompetitor.club}
+          </Text>
+
+          <Pressable
+            style={styles.detailsBtn}
+            onPress={() => openDetails(currentCompetitor)}
+          >
+            <Text style={styles.detailsBtnText}>👀 See Scores</Text>
+          </Pressable>
+        </View>
+      )}
 
       <TextInput
         style={styles.searchInput}
@@ -489,6 +557,7 @@ const handleScoreChange = (type: string, value: string) => {
                             "✅ Validated",
                             "Competitor validated successfully!"
                           );
+                    
                         }
 
                         if (selectedCategory) {
@@ -720,7 +789,21 @@ const styles = StyleSheet.create({
     color: "#555",
     marginBottom: 10,
   },
-
+  currentCard: {
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: "#f0f8ff",
+    borderWidth: 1,
+    borderColor: "#b3daff",
+    alignItems: "center",
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 8,
+    color: "#0077cc",
+  },
   discrepantGroup: {
     borderWidth: 1.5,
     borderColor: "red",
