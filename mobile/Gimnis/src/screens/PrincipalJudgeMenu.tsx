@@ -1,3 +1,4 @@
+// src/screens/PrincipalJudgeMenu.tsx
 import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
@@ -57,7 +58,6 @@ export default function PrincipalJudgeMenu() {
         if (data.already_voted) {
           setCurrentCompetitor(null);
         } else {
-          // Ensure competitor always has a readable name
           const competitorName =
             data.name ||
             (data.members
@@ -77,22 +77,48 @@ export default function PrincipalJudgeMenu() {
     }
   };
 
+  // --- sanitizer for inputs ---
+  const handleScoreChange = (type: "line" | "principal", value: string) => {
+    let sanitized = value.replace(/[^0-9.]/g, "");
+    const parts = sanitized.split(".");
+    if (parts.length > 2) sanitized = parts[0] + "." + parts[1];
+    if (parts[1]?.length > 1) sanitized = parts[0] + "." + parts[1].slice(0, 1);
+    if (/^0[0-9]/.test(sanitized)) sanitized = sanitized.replace(/^0+/, "");
+    if (sanitized.startsWith(".")) sanitized = "0" + sanitized;
+    if (/^(1[1-9]|[2-9][0-9])$/.test(sanitized)) sanitized = sanitized[0];
+    if (sanitized.endsWith(".")) {
+      if (type === "line") setLinePenalty(sanitized);
+      else setPrincipalPenalty(sanitized);
+      return;
+    }
+    let num = parseFloat(sanitized);
+    if (!isNaN(num)) {
+      if (num > 10) num = 10;
+      sanitized = num.toString();
+    }
+    if (type === "line") setLinePenalty(sanitized);
+    else setPrincipalPenalty(sanitized);
+  };
+
+  const allFieldsValid = () =>
+    linePenalty.trim() !== "" &&
+    principalPenalty.trim() !== "" &&
+    !isNaN(Number(linePenalty)) &&
+    !isNaN(Number(principalPenalty));
+
   const confirmVote = () => {
     if (!currentCompetitor) return;
 
-    if (
-      (!linePenalty && !principalPenalty) ||
-      (isNaN(Number(linePenalty)) && isNaN(Number(principalPenalty)))
-    ) {
-      Alert.alert("Error", "Please enter at least one valid penalty score.");
+    if (!allFieldsValid()) {
+      Alert.alert("Error", "Please enter both valid penalty scores.");
       return;
     }
 
     Alert.alert(
       "Confirm Vote",
       `Submitting penalties for ${currentCompetitor.name}:\n` +
-        `Line: ${linePenalty || "N/A"}\n` +
-        `Principal: ${principalPenalty || "N/A"}`,
+        `Line: ${linePenalty}\n` +
+        `Principal: ${principalPenalty}`,
       [
         { text: "Cancel", style: "cancel" },
         { text: "Submit", style: "destructive", onPress: voteCompetitor },
@@ -104,31 +130,29 @@ export default function PrincipalJudgeMenu() {
     if (!currentCompetitor) return;
 
     try {
-      // send both scores separately with correct score_type
-      if (linePenalty) {
-        await fetch(`${BASE_URL}/api/scores`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            competitor_id: currentCompetitor.competitor_id,
-            judge_id: judgeId,
-            score_type: "line_penalization",
-            value: parseFloat(linePenalty),
-          }),
-        });
-      }
+      const payloads = [
+        {
+          competitor_id: currentCompetitor.competitor_id,
+          judge_id: judgeId,
+          score_type: "line_penalization",
+          value: parseFloat(linePenalty),
+        },
+        {
+          competitor_id: currentCompetitor.competitor_id,
+          judge_id: judgeId,
+          score_type: "principal_penalization",
+          value: parseFloat(principalPenalty),
+        },
+      ];
 
-      if (principalPenalty) {
-        await fetch(`${BASE_URL}/api/scores`, {
+      for (const p of payloads) {
+        const res = await fetch(`${BASE_URL}/api/scores`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            competitor_id: currentCompetitor.competitor_id,
-            judge_id: judgeId,
-            score_type: "principal_penalization",
-            value: parseFloat(principalPenalty),
-          }),
+          body: JSON.stringify(p),
         });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Failed to submit score");
       }
 
       Alert.alert("✅ Success", "Penalties have been submitted!");
@@ -171,7 +195,6 @@ export default function PrincipalJudgeMenu() {
             {currentCompetitor.category} • {currentCompetitor.club}
           </Text>
 
-          {/* 👥 Members list */}
           <FlatList
             data={currentCompetitor.members}
             keyExtractor={(m) => m.id.toString()}
@@ -183,25 +206,31 @@ export default function PrincipalJudgeMenu() {
             )}
           />
 
-          {/* Line Penalization */}
           <TextInput
             style={styles.input}
             placeholder="Line Penalization"
             keyboardType="numeric"
             value={linePenalty}
-            onChangeText={setLinePenalty}
+            onChangeText={(t) => handleScoreChange("line", t)}
           />
 
-          {/* Principal Judge Penalization */}
           <TextInput
             style={styles.input}
             placeholder="Principal Judge Penalization"
             keyboardType="numeric"
             value={principalPenalty}
-            onChangeText={setPrincipalPenalty}
+            onChangeText={(t) => handleScoreChange("principal", t)}
           />
 
-          <Pressable style={[styles.btn, styles.voteBtn]} onPress={confirmVote}>
+          <Pressable
+            style={[
+              styles.btn,
+              styles.voteBtn,
+              !allFieldsValid() && styles.disabledBtn,
+            ]}
+            onPress={confirmVote}
+            disabled={!allFieldsValid()}
+          >
             <Text style={styles.btnText}>✅ Submit Penalties</Text>
           </Pressable>
         </View>
@@ -261,6 +290,7 @@ const styles = StyleSheet.create({
   btnText: { fontSize: 17, fontWeight: "600", color: "#fff" },
   myScoresBtn: { backgroundColor: "#0077cc" },
   voteBtn: { backgroundColor: "green", marginTop: 10 },
+  disabledBtn: { backgroundColor: "#999" },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",

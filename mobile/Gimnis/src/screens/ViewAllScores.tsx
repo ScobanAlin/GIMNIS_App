@@ -45,6 +45,15 @@ async function validateCompetitor(competitorId: number) {
   return await res.json();
 }
 
+async function unvalidateCompetitor(competitorId: number) {
+  const res = await fetch(`${BASE_URL}/api/scores/${competitorId}/unvalidate`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error("Failed to unvalidate competitor");
+  return await res.json();
+}
+
 async function fetchCompetitors(category: string) {
   const res = await fetch(
     `${BASE_URL}/api/competitors/by-category?category=${encodeURIComponent(
@@ -87,9 +96,25 @@ function hasDiscrepancy(group: [string, any][]) {
 
 function allScoresSubmitted(scores?: Record<string, any>) {
   if (!scores) return false;
-  return Object.values(scores).every(
+
+  // check all non-empty
+  const allFilled = Object.values(scores).every(
     (v) => v !== null && v !== undefined && v !== "N/A" && v !== ""
   );
+
+  if (!allFilled) return false;
+
+  // ✅ check difficulty penalization count
+  const diffPenalizations = Object.entries(scores).filter(
+    ([key, v]) =>
+      key.toLowerCase().includes("difficulty_penalization") &&
+      v !== null &&
+      v !== undefined &&
+      v !== "N/A" &&
+      v !== ""
+  );
+
+  return diffPenalizations.length >= 2;
 }
 
 function groupScores(
@@ -102,7 +127,7 @@ function groupScores(
     execution: [],
     artistry: [],
     difficulty: [],
-    difficulty_penalization: [], // ✅ separate bucket
+    difficulty_penalization: [],
     line_penalization: [],
     principal_penalization: [],
   };
@@ -110,33 +135,27 @@ function groupScores(
   for (const [label, val] of entries) {
     const lower = label.toLowerCase();
 
-    if (lower.includes("execution")) {
-      ordered.execution.push([label, val]);
-    } else if (lower.includes("artistry")) {
-      ordered.artistry.push([label, val]);
-    } else if (lower.includes("difficulty_penalization")) {
-      // ✅ catch "difficulty_penalization" explicitly
+    if (lower.includes("execution")) ordered.execution.push([label, val]);
+    else if (lower.includes("artistry")) ordered.artistry.push([label, val]);
+    else if (lower.includes("difficulty_penalization"))
       ordered.difficulty_penalization.push([label, val]);
-    } else if (lower.includes("difficulty")) {
-      // ✅ plain "difficulty" only
+    else if (lower.includes("difficulty"))
       ordered.difficulty.push([label, val]);
-    } else if (lower.includes("line")) {
+    else if (lower.includes("line"))
       ordered.line_penalization.push([label, val]);
-    } else if (lower.includes("principal")) {
+    else if (lower.includes("principal"))
       ordered.principal_penalization.push([label, val]);
-    }
   }
 
   return ordered;
 }
-
 
 function inferScoreTypeFromLabel(label: string): string {
   const lower = label.toLowerCase();
   if (lower.includes("execution")) return "execution";
   if (lower.includes("artistry")) return "artistry";
   if (lower.includes("difficulty penalization"))
-    return "difficulty_penalization"; // ✅
+    return "difficulty_penalization";
   if (lower.includes("difficulty")) return "difficulty";
   if (lower.includes("line")) return "line_penalization";
   if (lower.includes("principal")) return "principal_penalization";
@@ -162,6 +181,30 @@ export default function ViewAllScores() {
     value: string;
     score_type: string;
   } | null>(null);
+
+const [scores, setScores] = useState<Record<string, string>>({});
+
+// --- input sanitizer ---
+const handleScoreChange = (type: string, value: string) => {
+  let sanitized = value.replace(/[^0-9.]/g, "");
+  const parts = sanitized.split(".");
+  if (parts.length > 2) sanitized = parts[0] + "." + parts[1];
+  if (parts[1]?.length > 1) sanitized = parts[0] + "." + parts[1].slice(0, 1);
+  if (/^0[0-9]/.test(sanitized)) sanitized = sanitized.replace(/^0+/, "");
+  if (sanitized.startsWith(".")) sanitized = "0" + sanitized;
+  if (/^(1[1-9]|[2-9][0-9])$/.test(sanitized)) sanitized = sanitized[0];
+  if (sanitized.endsWith(".")) {
+    setScores((prev) => ({ ...prev, [type]: sanitized }));
+    return;
+  }
+  let num = parseFloat(sanitized);
+  if (!isNaN(num)) {
+    if (num > 10) num = 10;
+    sanitized = num.toString();
+  }
+  setScores((prev) => ({ ...prev, [type]: sanitized }));
+};
+
 
   const handleCategoryPress = async (category: string) => {
     setSelectedCategory(category);
@@ -256,17 +299,44 @@ export default function ViewAllScores() {
         )}
         {!loading &&
           competitors.map((c) => (
-            <View key={c.id} style={styles.competitorCard}>
-              <Text style={styles.competitorName}>{c.club}</Text>
-              <Text style={styles.detail}>Category: {c.category}</Text>
-
-              <View style={styles.membersBox}>
-                {c.members?.map((m: any) => (
-                  <Text key={m.id} style={styles.memberText}>
-                    - {m.first_name} {m.last_name} ({m.sex}, {m.age} yrs)
+            <View
+              key={c.id}
+              style={[
+                styles.competitorCard,
+                c.is_validated && styles.validatedCard,
+              ]}
+            >
+              {c.category.startsWith("I") ? (
+                <>
+                  {/* 👤 Individual competitor */}
+                  <Text style={styles.competitorName}>
+                    👤 {c.members[0]?.first_name} {c.members[0]?.last_name}
                   </Text>
-                ))}
-              </View>
+                  <Text style={styles.memberText}>
+                    ({c.members[0]?.sex}, {c.members[0]?.age} yrs)
+                  </Text>
+                </>
+              ) : (
+                <>
+                  {/* 👥 Group competitor */}
+                  <Text style={styles.membersTitle}>👥 Members</Text>
+                  <View style={styles.membersBox}>
+                    {c.members?.length > 0 ? (
+                      c.members.map((m: any) => (
+                        <Text key={m.id} style={styles.memberText}>
+                          • {m.first_name} {m.last_name} ({m.sex}, {m.age} yrs)
+                        </Text>
+                      ))
+                    ) : (
+                      <Text style={styles.memberText}>No members</Text>
+                    )}
+                  </View>
+                </>
+              )}
+
+              {/* Smaller Club info */}
+              <Text style={styles.detail}>Club: {c.club}</Text>
+              <Text style={styles.detail}>Category: {c.category}</Text>
 
               <Pressable
                 style={styles.detailsBtn}
@@ -284,11 +354,24 @@ export default function ViewAllScores() {
           <View style={styles.modalContent}>
             {selectedCompetitor && (
               <>
+                {/* Header */}
                 <Text style={styles.modalTitle}>
-                  Scores – {selectedCompetitor.club}
+                  {selectedCompetitor.category.startsWith("I")
+                    ? `${selectedCompetitor.members[0]?.last_name} ${selectedCompetitor.members[0]?.first_name} (${selectedCompetitor.members[0]?.sex}, ${selectedCompetitor.members[0]?.age} yrs)`
+                    : selectedCompetitor.members
+                        ?.map(
+                          (m: any) =>
+                            `${m.last_name} ${m.first_name} (${m.sex}, ${m.age} yrs)`
+                        )
+                        .join(" / ")}
+                </Text>
+                <Text style={styles.modalSubTitle}>
+                  Club: {selectedCompetitor.club} •{" "}
+                  {selectedCompetitor.category}
                 </Text>
 
-                <ScrollView>
+                {/* Scores */}
+                <ScrollView style={{ marginTop: 10 }}>
                   {(() => {
                     const groups = groupScores(
                       selectedCompetitor.scores,
@@ -306,7 +389,7 @@ export default function ViewAllScores() {
                         <View
                           style={[
                             styles.scoreGroup,
-                            discrepant && styles.discrepant,
+                            discrepant && styles.discrepantGroup,
                           ]}
                           key={label}
                         >
@@ -318,7 +401,7 @@ export default function ViewAllScores() {
                               <Text style={styles.scoreLine}>
                                 {judge}: {value ?? "N/A"}
                               </Text>
-                              {editable && (
+                              {!selectedCompetitor.is_validated && editable && (
                                 <Pressable
                                   style={styles.editBtn}
                                   onPress={() => {
@@ -367,40 +450,64 @@ export default function ViewAllScores() {
                     );
                   })()}
                 </ScrollView>
-                {/* footer with Cancel + Validate */}
+
+                {/* Footer buttons */}
                 <View style={styles.footerActions}>
                   <Pressable
-                    style={[
-                      styles.closeBtn,
-                      { backgroundColor: "gray", flex: 1, marginRight: 8 },
-                    ]}
+                    style={[styles.footerBtn, { backgroundColor: "gray" }]}
                     onPress={() => setModalVisible(false)}
                   >
-                    <Text style={styles.closeBtnText}>Cancel</Text>
+                    <Text style={styles.footerBtnText}>Cancel</Text>
                   </Pressable>
 
-                  {allScoresSubmitted(selectedCompetitor.scores) && (
-                    <Pressable
-                      style={[
-                        styles.closeBtn,
-                        { backgroundColor: "green", flex: 1 },
-                      ]}
-                      onPress={async () => {
-                        try {
+                  <Pressable
+                    style={[
+                      styles.footerBtn,
+                      {
+                        backgroundColor: selectedCompetitor.is_validated
+                          ? "red"
+                          : !allScoresSubmitted(selectedCompetitor.scores)
+                          ? "gray" // 🔹 Greyed out when not pressable
+                          : "green",
+                      },
+                    ]}
+                    disabled={
+                      !selectedCompetitor.is_validated &&
+                      !allScoresSubmitted(selectedCompetitor.scores)
+                    }
+                    onPress={async () => {
+                      try {
+                        if (selectedCompetitor.is_validated) {
+                          await unvalidateCompetitor(selectedCompetitor.id);
+                          Alert.alert(
+                            "❌ Unvalidated",
+                            "Competitor unvalidated successfully!"
+                          );
+                        } else {
                           await validateCompetitor(selectedCompetitor.id);
                           Alert.alert(
                             "✅ Validated",
                             "Competitor validated successfully!"
                           );
-                          setModalVisible(false);
-                        } catch (err: any) {
-                          Alert.alert("❌ Error", err.message);
                         }
-                      }}
-                    >
-                      <Text style={styles.closeBtnText}>Validate</Text>
-                    </Pressable>
-                  )}
+
+                        if (selectedCategory) {
+                          const data = await fetchCompetitors(selectedCategory);
+                          setCompetitors(data);
+                        }
+
+                        setModalVisible(false);
+                      } catch (err: any) {
+                        Alert.alert("❌ Error", err.message);
+                      }
+                    }}
+                  >
+                    <Text style={styles.footerBtnText}>
+                      {selectedCompetitor.is_validated
+                        ? "Unvalidate"
+                        : "Validate"}
+                    </Text>
+                  </Pressable>
                 </View>
               </>
             )}
@@ -418,12 +525,13 @@ export default function ViewAllScores() {
                 <TextInput
                   style={styles.scoreInput}
                   keyboardType="numeric"
-                  value={editingJudge.value}
-                  onChangeText={(text) =>
+                  value={scores[editingJudge.score_type] ?? editingJudge.value}
+                  onChangeText={(text) => {
+                    handleScoreChange(editingJudge.score_type, text);
                     setEditingJudge((prev) =>
                       prev ? { ...prev, value: text } : null
-                    )
-                  }
+                    );
+                  }}
                 />
 
                 <View style={styles.footerActions}>
@@ -500,6 +608,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#eee",
   },
+  validatedCard: {
+    borderColor: "green",
+    borderWidth: 2,
+    backgroundColor: "#e6ffe6",
+  },
   competitorName: { fontSize: 18, fontWeight: "600", marginBottom: 4 },
   detail: { fontSize: 14, color: "#555", marginBottom: 6 },
   membersBox: { marginVertical: 6, paddingLeft: 8 },
@@ -523,6 +636,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  membersTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 6,
+    marginBottom: 4,
+    color: "#222",
   },
   modalContent: {
     width: "85%",
@@ -593,5 +713,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 16,
+  },
+  modalSubTitle: {
+    fontSize: 14,
+    textAlign: "center",
+    color: "#555",
+    marginBottom: 10,
+  },
+
+  discrepantGroup: {
+    borderWidth: 1.5,
+    borderColor: "red",
+    borderRadius: 6,
+    backgroundColor: "#ffeaea",
+    padding: 6,
+    marginBottom: 12,
+  },
+  footerBtn: {
+    flex: 1,
+    padding: 12,
+    marginHorizontal: 6,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  footerBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

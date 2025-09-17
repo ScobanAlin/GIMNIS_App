@@ -142,6 +142,33 @@ export default function MyScores() {
         {!loading &&
           scores.map((s) => (
             <View key={s.id} style={styles.scoreCard}>
+              {/* 👥 or 👤 depending on category */}
+              {s.category.startsWith("I") ? (
+                <>
+                  <Text style={styles.membersTitle}>
+                    👤 {s.members[0]?.first_name} {s.members[0]?.last_name}
+                  </Text>
+                  <Text style={styles.memberText}>
+                    ({s.members[0]?.sex}, {s.members[0]?.age} yrs)
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.membersTitle}>👥 Members</Text>
+                  <View style={styles.membersBox}>
+                    {s.members.length > 0 ? (
+                      s.members.map((m) => (
+                        <Text key={m.id} style={styles.memberText}>
+                          • {m.first_name} {m.last_name} ({m.sex}, {m.age} yrs)
+                        </Text>
+                      ))
+                    ) : (
+                      <Text style={styles.memberText}>No members</Text>
+                    )}
+                  </View>
+                </>
+              )}
+
               <Text style={styles.detail}>
                 <Text style={{ fontWeight: "600" }}>Category:</Text>{" "}
                 {s.category}
@@ -149,15 +176,6 @@ export default function MyScores() {
               <Text style={styles.detail}>
                 <Text style={{ fontWeight: "600" }}>Club:</Text> {s.club}
               </Text>
-
-              {/* 👥 Members */}
-              <View style={styles.membersBox}>
-                {s.members.map((m) => (
-                  <Text key={m.id} style={styles.memberText}>
-                    - {m.first_name} {m.last_name} ({m.sex}, {m.age} yrs)
-                  </Text>
-                ))}
-              </View>
 
               {/* 🎯 Score */}
               <Text style={styles.scoreLine}>
@@ -214,6 +232,13 @@ const styles = StyleSheet.create({
   },
   detail: { fontSize: 14, color: "#555", marginBottom: 4 },
   membersBox: { marginBottom: 6, paddingLeft: 8 },
+  membersTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 6,
+    marginBottom: 4,
+    color: "#222",
+  },
   memberText: { fontSize: 14, color: "#333" },
   scoreLine: { fontSize: 16, fontWeight: "600", marginTop: 4 },
   noResults: {

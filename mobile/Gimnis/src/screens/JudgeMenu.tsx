@@ -30,12 +30,21 @@ type CurrentCompetitor = {
   club: string;
   already_voted?: boolean;
   members: Member[];
+  is_validated?: boolean;
 } | null;
 
 type JudgeMenuRouteParams = {
   judgeId: number;
   role: "execution" | "artistry" | "difficulty" | "principal" | string;
   name: string;
+};
+
+// define required fields by judge role
+const requiredFields: Record<string, string[]> = {
+  principal: ["line_penalization", "principal_penalization"],
+  difficulty: ["difficulty", "difficulty_penalization"],
+  execution: ["execution_penalization"], // execution = 10 - penalization
+  artistry: ["artistry"],
 };
 
 export default function JudgeMenu() {
@@ -63,15 +72,8 @@ export default function JudgeMenu() {
         `${BASE_URL}/api/votes/current?judge_id=${judgeId}`
       );
       const text = await res.text();
-
       if (!res.ok) throw new Error(`Failed (${res.status})`);
-
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error("Invalid server response");
-      }
+      const data = JSON.parse(text);
 
       if (data && data.competitor_id) {
         setCurrentCompetitor(data.already_voted ? null : data);
@@ -86,60 +88,39 @@ export default function JudgeMenu() {
     }
   };
 
-const handleScoreChange = (type: string, value: string) => {
-  // Allow only digits and dot
-  let sanitized = value.replace(/[^0-9.]/g, "");
-
-  // Prevent multiple dots
-  const parts = sanitized.split(".");
-  if (parts.length > 2) {
-    sanitized = parts[0] + "." + parts[1];
-  }
-
-  // Only 1 decimal place
-  if (parts[1]?.length > 1) {
-    sanitized = parts[0] + "." + parts[1].slice(0, 1);
-  }
-
-  // Remove leading zero if not "0."
-  if (/^0[0-9]/.test(sanitized)) {
-    sanitized = sanitized.replace(/^0+/, "");
-  }
-  if (sanitized.startsWith(".")) {
-    sanitized = "0" + sanitized; // ".5" -> "0.5"
-  }
-
-  // Block numbers > 10 except "10"
-  if (/^(1[1-9]|[2-9][0-9])$/.test(sanitized)) {
-    sanitized = sanitized[0];
-  }
-
-  // If ends with "." → allow typing (skip parseFloat)
-  if (sanitized.endsWith(".")) {
-    setScores((prev) => ({ ...prev, [type]: sanitized }));
-    return;
-  }
-
-  // Clamp at 10 if parsed
-  let num = parseFloat(sanitized);
-  if (!isNaN(num)) {
-    if (num > 10) num = 10;
-    sanitized = num.toString();
-  }
-
-  setScores((prev) => ({ ...prev, [type]: sanitized }));
-};
-  const confirmVote = () => {
-    if (!currentCompetitor) return;
-
-    const filledScores = Object.entries(scores).filter(
-      ([, v]) => v && !isNaN(Number(v))
-    );
-    if (filledScores.length === 0) {
-      Alert.alert("Error", "Please enter at least one valid score.");
+  const handleScoreChange = (type: string, value: string) => {
+    let sanitized = value.replace(/[^0-9.]/g, "");
+    const parts = sanitized.split(".");
+    if (parts.length > 2) sanitized = parts[0] + "." + parts[1];
+    if (parts[1]?.length > 1) sanitized = parts[0] + "." + parts[1].slice(0, 1);
+    if (/^0[0-9]/.test(sanitized)) sanitized = sanitized.replace(/^0+/, "");
+    if (sanitized.startsWith(".")) sanitized = "0" + sanitized;
+    if (/^(1[1-9]|[2-9][0-9])$/.test(sanitized)) sanitized = sanitized[0];
+    if (sanitized.endsWith(".")) {
+      setScores((prev) => ({ ...prev, [type]: sanitized }));
       return;
     }
+    let num = parseFloat(sanitized);
+    if (!isNaN(num)) {
+      if (num > 10) num = 10;
+      sanitized = num.toString();
+    }
+    setScores((prev) => ({ ...prev, [type]: sanitized }));
+  };
 
+  const allFieldsValid = () => {
+    const fields = requiredFields[judgeRole] || [judgeRole];
+    return fields.every(
+      (f) => scores[f] && !isNaN(Number(scores[f]))
+    );
+  };
+
+  const confirmVote = () => {
+    if (!currentCompetitor) return;
+    if (!allFieldsValid()) {
+      Alert.alert("Error", "Please fill in all required score fields.");
+      return;
+    }
     Alert.alert(
       "Confirm Vote",
       `Submit your scores for ${currentCompetitor.category} – ${currentCompetitor.club}?`,
@@ -152,14 +133,11 @@ const handleScoreChange = (type: string, value: string) => {
 
   const voteCompetitor = async () => {
     if (!currentCompetitor) return;
-
     try {
       const payloads = Object.entries(scores)
         .filter(([, v]) => v && !isNaN(Number(v)))
         .map(([score_type, value]) => {
           let finalValue = parseFloat(value);
-
-          // ✅ execution judge: penalization → 10 - value
           if (score_type === "execution_penalization") {
             return {
               competitor_id: currentCompetitor.competitor_id,
@@ -168,8 +146,6 @@ const handleScoreChange = (type: string, value: string) => {
               value: 10 - finalValue,
             };
           }
-
-          // ✅ others: send raw
           return {
             competitor_id: currentCompetitor.competitor_id,
             judge_id: judgeId,
@@ -291,13 +267,14 @@ const handleScoreChange = (type: string, value: string) => {
       </Pressable>
 
       {loading ? (
-        <ActivityIndicator
-          size="large"
-          color="#000"
-          style={{ marginTop: 30 }}
-        />
+        <ActivityIndicator size="large" color="#000" style={{ marginTop: 30 }} />
       ) : currentCompetitor ? (
-        <View style={styles.card}>
+        <View
+          style={[
+            styles.card,
+            currentCompetitor.is_validated && styles.validatedCard,
+          ]}
+        >
           <Text style={styles.cardTitle}>Current Competitor</Text>
           <Text style={styles.detail}>
             {currentCompetitor.category} • {currentCompetitor.club}
@@ -308,22 +285,27 @@ const handleScoreChange = (type: string, value: string) => {
             keyExtractor={(m) => m.id.toString()}
             renderItem={({ item }) => (
               <Text style={styles.memberText}>
-                - {item.first_name} {item.last_name} ({item.sex}, {item.age}{" "}
-                yrs)
+                - {item.first_name} {item.last_name} ({item.sex}, {item.age} yrs)
               </Text>
             )}
           />
 
           {renderScoreInputs()}
 
-          <Pressable style={[styles.btn, styles.voteBtn]} onPress={confirmVote}>
+          <Pressable
+            style={[
+              styles.btn,
+              styles.voteBtn,
+              !allFieldsValid() && styles.disabledBtn,
+            ]}
+            onPress={confirmVote}
+            disabled={!allFieldsValid()}
+          >
             <Text style={styles.btnText}>✅ Submit Vote</Text>
           </Pressable>
         </View>
       ) : (
-        <Text style={styles.waiting}>
-          ⏳ Waiting for the next competitor...
-        </Text>
+        <Text style={styles.waiting}>⏳ Waiting for the next competitor...</Text>
       )}
     </SafeAreaView>
   );
@@ -357,6 +339,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 20,
   },
+  validatedCard: {
+    borderColor: "green",
+    borderWidth: 2,
+    backgroundColor: "#e6ffe6",
+  },
   cardTitle: {
     fontSize: 18,
     fontWeight: "600",
@@ -376,6 +363,7 @@ const styles = StyleSheet.create({
   btnText: { fontSize: 17, fontWeight: "600", color: "#fff" },
   myScoresBtn: { backgroundColor: "#0077cc" },
   voteBtn: { backgroundColor: "green", marginTop: 10 },
+  disabledBtn: { backgroundColor: "#999" },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",

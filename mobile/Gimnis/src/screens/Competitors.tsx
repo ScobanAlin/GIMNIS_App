@@ -1,3 +1,4 @@
+// src/screens/JudgeMenu.tsx
 import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
@@ -25,6 +26,7 @@ type Competitor = {
   category: string;
   club: string;
   members: CompetitorMember[];
+  is_validated?: boolean;
 };
 
 type CurrentCompetitor = {
@@ -58,23 +60,27 @@ const categories = [
 ];
 
 export default function Competitors() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [allCompetitors, setAllCompetitors] = useState<Competitor[]>([]);
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [currentCompetitor, setCurrentCompetitor] =
     useState<CurrentCompetitor>(null);
 
-  const fetchCompetitors = async () => {
+  // --- API calls ---
+  const fetchCompetitorsByCategory = async (category: string) => {
     try {
       setLoading(true);
-      const res = await fetch(`${BASE_URL}/api/competitors`);
+      const res = await fetch(
+        `${BASE_URL}/api/competitors/by-category?category=${encodeURIComponent(
+          category
+        )}`
+      );
       const data = await res.json();
       if (!res.ok)
         throw new Error(data?.error || "Failed to fetch competitors");
-      setAllCompetitors(data); // includes members
+      setCompetitors(data);
     } catch (e: any) {
       setError(e.message || "Network error");
     } finally {
@@ -97,13 +103,6 @@ export default function Competitors() {
     }
   };
 
-  useEffect(() => {
-    fetchCompetitors();
-    fetchCurrentCompetitor();
-    const interval = setInterval(fetchCurrentCompetitor, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
   const deleteCompetitor = async (id: number) => {
     try {
       const res = await fetch(`${BASE_URL}/api/competitors/${id}`, {
@@ -112,7 +111,6 @@ export default function Competitors() {
       const data = await res.json();
       if (!res.ok)
         throw new Error(data?.error || "Failed to delete competitor");
-      setAllCompetitors((prev) => prev.filter((c) => c.id !== id));
       setCompetitors((prev) => prev.filter((c) => c.id !== id));
       Alert.alert("Deleted", "Competitor removed successfully.");
     } catch (e: any) {
@@ -148,35 +146,25 @@ export default function Competitors() {
     }
   };
 
+  // --- lifecycle ---
+  useEffect(() => {
+    fetchCurrentCompetitor();
+    const interval = setInterval(fetchCurrentCompetitor, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleCategoryPress = (cat: string) => {
     setSelectedCategory(cat);
-    const filtered = allCompetitors.filter((c) => c.category === cat);
-    setCompetitors(filtered);
+    fetchCompetitorsByCategory(cat);
   };
 
   const filteredCategories = categories.filter((cat) =>
     cat.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" />
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={styles.center}>
-        <Text style={{ color: "crimson" }}>{error}</Text>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Competitors</Text>
+      <Text style={styles.title}>All Competitors</Text>
 
       {/* 🏅 Current competitor */}
       {currentCompetitor ? (
@@ -186,7 +174,6 @@ export default function Competitors() {
             {currentCompetitor.category} – {currentCompetitor.club}
           </Text>
 
-          {/* Members if available */}
           {currentCompetitor.members && (
             <View style={styles.membersBox}>
               {currentCompetitor.members.map((m) => (
@@ -249,71 +236,92 @@ export default function Competitors() {
 
       {/* Competitors List */}
       <ScrollView style={{ flex: 1 }}>
+        {loading && (
+          <ActivityIndicator size="small" style={{ marginVertical: 10 }} />
+        )}
         {!loading && selectedCategory && competitors.length === 0 && (
           <Text style={styles.noResults}>
             No competitors in {selectedCategory}
           </Text>
         )}
-        {!loading &&
-          competitors.map((c) => (
-            <View key={c.id} style={styles.competitorCard}>
-              <Text style={styles.detail}>
-                <Text style={{ fontWeight: "600" }}>Club:</Text> {c.club}
-              </Text>
-              <Text style={styles.detail}>
-                <Text style={{ fontWeight: "600" }}>Category:</Text>{" "}
-                {c.category}
-              </Text>
+        {competitors.map((c) => (
+          <View
+            key={c.id}
+            style={[
+              styles.competitorCard,
+              c.is_validated && styles.validatedCard,
+            ]}
+          >
+            {c.category.startsWith("I") ? (
+              // Individual competitor
+              <>
+                <Text style={styles.membersTitle}>
+                  👤 {c.members[0]?.first_name} {c.members[0]?.last_name}
+                </Text>
+                <Text style={styles.memberText}>
+                  ({c.members[0]?.sex}, {c.members[0]?.age} yrs)
+                </Text>
+              </>
+            ) : (
+              // Group competitor
+              <>
+                <Text style={styles.membersTitle}>👥 Members</Text>
+                <View style={styles.membersBox}>
+                  {c.members.length > 0 ? (
+                    c.members.map((m) => (
+                      <Text key={m.id} style={styles.memberText}>
+                        • {m.first_name} {m.last_name} ({m.sex}, {m.age} yrs)
+                      </Text>
+                    ))
+                  ) : (
+                    <Text style={styles.memberText}>No members</Text>
+                  )}
+                </View>
+              </>
+            )}
 
-              {/* 👥 Members list */}
-              <Text style={{ fontWeight: "600", marginTop: 6 }}>Members:</Text>
-              <View style={styles.membersBox}>
-                {c.members.length > 0 ? (
-                  c.members.map((m) => (
-                    <Text key={m.id} style={styles.memberText}>
-                      • {m.first_name} {m.last_name} ({m.sex}, {m.age} yrs)
-                    </Text>
-                  ))
-                ) : (
-                  <Text style={styles.memberText}>No members</Text>
-                )}
-              </View>
+            {/* 🔹 Club + Category smaller */}
+            <Text style={styles.clubText}>Club: {c.club}</Text>
+            <Text style={styles.categoryText}>Category: {c.category}</Text>
 
-              {/* Buttons Row */}
-              <View style={styles.btnRow}>
-                <Pressable
-                  style={[styles.actionBtn, { backgroundColor: "crimson" }]}
-                  onPress={() =>
-                    Alert.alert("Confirm", `Delete competitor #${c.id}?`, [
-                      { text: "Cancel", style: "cancel" },
-                      {
-                        text: "Delete",
-                        style: "destructive",
-                        onPress: () => deleteCompetitor(c.id),
-                      },
-                    ])
-                  }
-                >
-                  <Text style={styles.btnText}>Delete</Text>
-                </Pressable>
+            <View style={styles.btnRow}>
+              <Pressable
+                style={[styles.actionBtn, { backgroundColor: "crimson" }]}
+                onPress={() =>
+                  Alert.alert("Confirm", `Delete competitor #${c.id}?`, [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete",
+                      style: "destructive",
+                      onPress: () => deleteCompetitor(c.id),
+                    },
+                  ])
+                }
+              >
+                <Text style={styles.btnText}>Delete</Text>
+              </Pressable>
 
-                <Pressable
-                  style={[
-                    styles.actionBtn,
-                    currentCompetitor
-                      ? styles.disabledBtn
-                      : { backgroundColor: "green" },
-                  ]}
-                  disabled={!!currentCompetitor}
-                  onPress={() => startVote(c.id)}
-                >
-                  <Text style={styles.btnText}>
-                    {currentCompetitor ? "Disabled" : "Start Vote"}
-                  </Text>
-                </Pressable>
-              </View>
+              <Pressable
+                style={[
+                  styles.actionBtn,
+                  c.is_validated || currentCompetitor
+                    ? styles.disabledBtn
+                    : { backgroundColor: "green" },
+                ]}
+                disabled={!!currentCompetitor || c.is_validated}
+                onPress={() => startVote(c.id)}
+              >
+                <Text style={styles.btnText}>
+                  {c.is_validated
+                    ? "Validated"
+                    : currentCompetitor
+                    ? "Disabled"
+                    : "Start Vote"}
+                </Text>
+              </Pressable>
             </View>
-          ))}
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -321,12 +329,6 @@ export default function Competitors() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#fff" },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-  },
   title: {
     fontSize: 22,
     fontWeight: "700",
@@ -391,15 +393,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#eee",
   },
-  detail: { fontSize: 14, color: "#555" },
-  membersBox: {
-    marginVertical: 8,
-    paddingLeft: 10,
+  validatedCard: {
+    borderColor: "green",
+    borderWidth: 2,
+    backgroundColor: "#e6ffe6",
   },
-  memberText: {
-    fontSize: 14,
+  membersTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 6,
     color: "#333",
   },
+  clubText: { fontSize: 13, color: "#555", marginTop: 6 },
+  categoryText: { fontSize: 13, color: "#555" },
+  membersBox: { marginBottom: 8, paddingLeft: 10 },
+  memberText: { fontSize: 14, color: "#333" },
   noResults: {
     marginTop: 10,
     fontSize: 16,

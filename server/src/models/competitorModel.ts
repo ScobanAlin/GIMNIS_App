@@ -1,6 +1,6 @@
 import db from "../db";
 
-// ✅ Insert competitor (no team name anymore, just category + club)
+// ✅ Insert competitor
 export const insertCompetitor = async (
   category: string,
   club: string,
@@ -12,7 +12,6 @@ export const insertCompetitor = async (
     sex: "M" | "F";
   }[]
 ) => {
-  // 1. Insert competitor
   const compRes = await db.query(
     `INSERT INTO competitors (category, club)
      VALUES ($1, $2)
@@ -21,7 +20,6 @@ export const insertCompetitor = async (
   );
   const competitor = compRes.rows[0];
 
-  // 2. Insert members
   for (const m of members) {
     await db.query(
       `INSERT INTO competitor_members
@@ -44,7 +42,7 @@ export const deleteCompetitorById = async (id: number) => {
   return res.rows[0];
 };
 
-// ✅ Get all competitors + members
+// ✅ Get all competitors
 export const getAllCompetitors = async () => {
   const query = `
     SELECT c.id as competitor_id,
@@ -85,7 +83,7 @@ export const getAllCompetitors = async () => {
   return Object.values(grouped);
 };
 
-// ✅ Fetch competitors with scores (by category)
+// ✅ Fetch competitors with scores & validation status
 export const fetchCompetitorsWithScores = async (category: string) => {
   const query = `
     SELECT 
@@ -100,13 +98,15 @@ export const fetchCompetitorsWithScores = async (category: string) => {
       j.id AS judge_id,
       j.first_name || ' ' || j.last_name AS judge_name,
       s.value AS score_value,
-      s.score_type
+      s.score_type,
+      vc.competitor_id IS NOT NULL AS is_validated
     FROM competitors c
     LEFT JOIN competitor_members m ON m.competitor_id = c.id
     CROSS JOIN judges j
     LEFT JOIN scores s 
       ON s.judge_id = j.id 
      AND s.competitor_id = c.id
+    LEFT JOIN validated_competitors vc ON vc.competitor_id = c.id
     WHERE c.category = $1
     ORDER BY c.id, m.id, j.id;
   `;
@@ -123,10 +123,10 @@ export const fetchCompetitorsWithScores = async (category: string) => {
         club: row.club,
         members: [],
         scores: {},
+        is_validated: row.is_validated,
       };
     }
 
-    // add member if exists
     if (
       row.member_id &&
       !grouped[row.competitor_id].members.find((m: any) => m.id === row.member_id)
@@ -140,7 +140,6 @@ export const fetchCompetitorsWithScores = async (category: string) => {
       });
     }
 
-    // add score if present
     if (row.judge_id) {
       grouped[row.competitor_id].scores[row.judge_name] = {
         value: row.score_value !== null ? Number(row.score_value) : "N/A",
@@ -150,4 +149,61 @@ export const fetchCompetitorsWithScores = async (category: string) => {
   }
 
   return Object.values(grouped);
+};
+
+// ✅ Validate competitor
+export const validateCompetitorById = async (competitorId: number) => {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+
+    await client.query(
+      `INSERT INTO validated_competitors (competitor_id) 
+       VALUES ($1)
+       ON CONFLICT (competitor_id) DO NOTHING;`,
+      [competitorId]
+    );
+
+    await client.query(
+      `DELETE FROM current_vote WHERE competitor_id = $1;`,
+      [competitorId]
+    );
+
+    await client.query("COMMIT");
+    return { competitorId, success: true };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const unvalidateCompetitorById = async (competitorId: number) => {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Remove from validated_competitors
+    await client.query(
+      `DELETE FROM validated_competitors WHERE competitor_id = $1;`,
+      [competitorId]
+    );
+
+    // (Optional) put them back into current_vote
+    await client.query(
+      `INSERT INTO current_vote (competitor_id)
+       VALUES ($1)
+       ON CONFLICT (competitor_id) DO NOTHING;`,
+      [competitorId]
+    );
+
+    await client.query("COMMIT");
+    return { success: true };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 };
