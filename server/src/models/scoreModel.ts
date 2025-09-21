@@ -40,3 +40,33 @@ export const fetchScoresByCompetitor = async (competitorId: number) => {
   const result = await db.query(query, [competitorId]);
   return result.rows;
 };
+
+export const deleteScoreModel = async (
+  competitor_id: number,
+  score_type: string,
+  judge_id?: number
+) => {
+  if (score_type === "difficulty") {
+    // Delete BOTH difficulty + penalization for ALL difficulty judges
+    const query = `
+      DELETE FROM scores
+      WHERE competitor_id = $1
+      AND score_type IN ('difficulty','difficulty_penalization')
+      AND judge_id IN (SELECT id FROM judges WHERE role = 'difficulty')
+    `;
+    await db.query(query, [competitor_id]);
+    return { deleted: "all difficulty judges" };
+  } else {
+    if (!judge_id) {
+      throw new Error("judge_id required for non-difficulty deletions");
+    }
+    const query = `
+      DELETE FROM scores
+      WHERE judge_id = $1
+      AND competitor_id = $2
+      AND score_type = $3
+    `;
+    await db.query(query, [judge_id, competitor_id, score_type]);
+    return { deleted: `judge ${judge_id}, type ${score_type}` };
+  }
+};

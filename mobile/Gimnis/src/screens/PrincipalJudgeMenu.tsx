@@ -1,4 +1,3 @@
-// src/screens/PrincipalJudgeMenu.tsx
 import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
@@ -10,6 +9,7 @@ import {
   TextInput,
   View,
   FlatList,
+  ScrollView,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -40,7 +40,6 @@ export default function PrincipalJudgeMenu() {
   const [loading, setLoading] = useState(true);
   const [currentCompetitor, setCurrentCompetitor] =
     useState<CurrentCompetitor>(null);
-
   const [linePenalty, setLinePenalty] = useState("");
   const [principalPenalty, setPrincipalPenalty] = useState("");
 
@@ -77,7 +76,6 @@ export default function PrincipalJudgeMenu() {
     }
   };
 
-  // --- sanitizer for inputs ---
   const handleScoreChange = (type: "line" | "principal", value: string) => {
     let sanitized = value.replace(/[^0-9.]/g, "");
     const parts = sanitized.split(".");
@@ -155,7 +153,7 @@ export default function PrincipalJudgeMenu() {
         if (!res.ok) throw new Error(data?.error || "Failed to submit score");
       }
 
-      Alert.alert("✅ Success", "Penalties have been submitted!");
+      Alert.alert("Success", "Penalties have been submitted!");
       setLinePenalty("");
       setPrincipalPenalty("");
       fetchCurrentCompetitor();
@@ -172,73 +170,124 @@ export default function PrincipalJudgeMenu() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Principal Judge Menu</Text>
-
-      <Pressable
-        style={[styles.btn, styles.myScoresBtn]}
-        onPress={() => navigation.navigate("ViewAllScores")}
-      >
-        <Text style={styles.btnText}>📊 View All Scores</Text>
-      </Pressable>
-
-      {loading ? (
-        <ActivityIndicator
-          size="large"
-          color="#000"
-          style={{ marginTop: 30 }}
-        />
-      ) : currentCompetitor ? (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Current Competitor</Text>
-          <Text style={styles.competitorName}>{currentCompetitor.name}</Text>
-          <Text style={styles.detail}>
-            {currentCompetitor.category} • {currentCompetitor.club}
-          </Text>
-
-          <FlatList
-            data={currentCompetitor.members}
-            keyExtractor={(m) => m.id.toString()}
-            renderItem={({ item }) => (
-              <Text style={styles.memberText}>
-                - {item.first_name} {item.last_name} ({item.sex}, {item.age}{" "}
-                yrs)
-              </Text>
-            )}
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Line Penalization"
-            keyboardType="numeric"
-            value={linePenalty}
-            onChangeText={(t) => handleScoreChange("line", t)}
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Principal Judge Penalization"
-            keyboardType="numeric"
-            value={principalPenalty}
-            onChangeText={(t) => handleScoreChange("principal", t)}
-          />
-
-          <Pressable
-            style={[
-              styles.btn,
-              styles.voteBtn,
-              !allFieldsValid() && styles.disabledBtn,
-            ]}
-            onPress={confirmVote}
-            disabled={!allFieldsValid()}
-          >
-            <Text style={styles.btnText}>✅ Submit Penalties</Text>
-          </Pressable>
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.crownContainer}>
+            <Text style={styles.crownIcon}>👑</Text>
+          </View>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Principal Judge</Text>
+            <Text style={styles.subtitle}>Competition Authority</Text>
+          </View>
         </View>
-      ) : (
-        <Text style={styles.waiting}>
-          ⏳ Waiting for the next competitor...
-        </Text>
-      )}
+      </View>
+
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <Pressable
+          style={styles.viewAllScoresBtn}
+          onPress={() => navigation.navigate("ViewAllScores")}
+        >
+          <View style={styles.btnContent}>
+            <Text style={styles.btnIcon}>📊</Text>
+            <Text style={styles.btnText}>View All Scores</Text>
+          </View>
+        </Pressable>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#96CEB4" />
+            <Text style={styles.loadingText}>Loading competitor...</Text>
+          </View>
+        ) : currentCompetitor ? (
+          <View style={styles.competitorCard}>
+            <View style={styles.competitorHeader}>
+              <Text style={styles.competitorTitle}>Current Competitor</Text>
+              <View style={styles.liveIndicator}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>LIVE</Text>
+              </View>
+            </View>
+
+            <Text style={styles.competitorName}>{currentCompetitor.name}</Text>
+            <Text style={styles.competitorDetails}>
+              {currentCompetitor.category}
+            </Text>
+            <Text style={styles.clubName}>{currentCompetitor.club}</Text>
+
+            <View style={styles.membersSection}>
+              <Text style={styles.membersTitle}>Team Members</Text>
+              <FlatList
+                data={currentCompetitor.members}
+                keyExtractor={(m) => m.id.toString()}
+                renderItem={({ item }) => (
+                  <View style={styles.memberItem}>
+                    <Text style={styles.memberName}>
+                      {item.first_name} {item.last_name}
+                    </Text>
+                    <Text style={styles.memberDetails}>
+                      {item.sex} • {item.age} years
+                    </Text>
+                  </View>
+                )}
+                scrollEnabled={false}
+              />
+            </View>
+
+            <View style={styles.penaltySection}>
+              <Text style={styles.penaltySectionTitle}>Penalty Assessment</Text>
+
+              <View style={styles.penaltyInputs}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Line Penalization</Text>
+                  <TextInput
+                    style={styles.penaltyInput}
+                    placeholder="0.0"
+                    keyboardType="numeric"
+                    value={linePenalty}
+                    onChangeText={(t) => handleScoreChange("line", t)}
+                    placeholderTextColor="#B2BEC3"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Principal Penalization</Text>
+                  <TextInput
+                    style={styles.penaltyInput}
+                    placeholder="0.0"
+                    keyboardType="numeric"
+                    value={principalPenalty}
+                    onChangeText={(t) => handleScoreChange("principal", t)}
+                    placeholderTextColor="#B2BEC3"
+                  />
+                </View>
+              </View>
+            </View>
+
+            <Pressable
+              style={[
+                styles.submitBtn,
+                !allFieldsValid() && styles.submitBtnDisabled,
+              ]}
+              onPress={confirmVote}
+              disabled={!allFieldsValid()}
+            >
+              <Text style={styles.submitBtnText}>Submit Penalties</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.waitingContainer}>
+            <Text style={styles.waitingIcon}>⏳</Text>
+            <Text style={styles.waitingTitle}>Waiting for Competition</Text>
+            <Text style={styles.waitingText}>
+              No active competitor at the moment
+            </Text>
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -246,60 +295,255 @@ export default function PrincipalJudgeMenu() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "flex-start",
+    backgroundColor: "#F8F9FA",
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 32,
+    backgroundColor: "#96CEB4",
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: "#96CEB4",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  headerContent: {
+    flexDirection: "row",
     alignItems: "center",
-    padding: 20,
-    backgroundColor: "#f4f7fa",
+  },
+  crownContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  crownIcon: {
+    fontSize: 28,
+  },
+  headerText: {
+    flex: 1,
   },
   title: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "rgba(255, 255, 255, 0.9)",
+    fontWeight: "500",
+  },
+  content: {
+    flex: 1,
+    padding: 24,
+  },
+  viewAllScoresBtn: {
+    backgroundColor: "#6C5CE7",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: "#6C5CE7",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  btnContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  btnIcon: {
+    fontSize: 20,
+  },
+  btnText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#636E72",
+    fontWeight: "500",
+  },
+  competitorCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 24,
+    elevation: 16,
+  },
+  competitorHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  competitorTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#2D3436",
+  },
+  liveIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#00B894",
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    gap: 6,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FFFFFF",
+  },
+  liveText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  competitorName: {
     fontSize: 24,
+    fontWeight: "800",
+    color: "#2D3436",
+    marginBottom: 8,
+  },
+  competitorDetails: {
+    fontSize: 16,
+    color: "#636E72",
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  clubName: {
+    fontSize: 18,
+    color: "#96CEB4",
     fontWeight: "700",
     marginBottom: 20,
-    marginTop: 10,
   },
-  card: {
-    width: "100%",
-    padding: 20,
-    borderRadius: 16,
-    backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 6,
-    elevation: 3,
-    alignItems: "center",
-    marginTop: 20,
+  membersSection: {
+    marginBottom: 24,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 10,
-    color: "#0077cc",
+  membersTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2D3436",
+    marginBottom: 12,
   },
-  competitorName: { fontSize: 20, fontWeight: "700", marginBottom: 4 },
-  detail: { fontSize: 16, color: "#666", marginBottom: 10 },
-  memberText: { fontSize: 15, color: "#444", marginBottom: 4 },
-  waiting: { fontSize: 16, color: "#999", marginTop: 40 },
-  btn: {
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: "center",
-    width: 220,
-    marginTop: 10,
-  },
-  btnText: { fontSize: 17, fontWeight: "600", color: "#fff" },
-  myScoresBtn: { backgroundColor: "#0077cc" },
-  voteBtn: { backgroundColor: "green", marginTop: 10 },
-  disabledBtn: { backgroundColor: "#999" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
+  memberItem: {
+    backgroundColor: "#F8F9FA",
     borderRadius: 12,
     padding: 12,
-    width: "80%",
-    fontSize: 16,
-    marginVertical: 8,
+    marginBottom: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  memberName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#2D3436",
+  },
+  memberDetails: {
+    fontSize: 14,
+    color: "#636E72",
+  },
+  penaltySection: {
+    marginBottom: 24,
+  },
+  penaltySectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#2D3436",
+    marginBottom: 16,
     textAlign: "center",
-    backgroundColor: "#f9f9f9",
+  },
+  penaltyInputs: {
+    gap: 16,
+  },
+  inputGroup: {
+    gap: 8,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2D3436",
+  },
+  penaltyInput: {
+    backgroundColor: "#F8F9FA",
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    borderWidth: 2,
+    borderColor: "#E1E8ED",
+  },
+  submitBtn: {
+    backgroundColor: "#96CEB4",
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: "center",
+    shadowColor: "#96CEB4",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  submitBtnDisabled: {
+    backgroundColor: "#B2BEC3",
+    shadowOpacity: 0.1,
+  },
+  submitBtnText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  waitingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+  },
+  waitingIcon: {
+    fontSize: 48,
+  },
+  waitingTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#2D3436",
+    textAlign: "center",
+  },
+  waitingText: {
+    fontSize: 16,
+    color: "#636E72",
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: 24,
+    paddingBottom: 40, // Extra padding at bottom to ensure submit button is visible
   },
 });

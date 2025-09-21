@@ -37,37 +37,28 @@ type CompetitorPayload = {
 };
 
 const CATEGORIES = [
-  // Kids Development (7-8 ani)
   "Individual Men - Kids Development",
   "Individual Women - Kids Development",
   "Mixed Pair - Kids Development",
   "Trio - Kids Development",
   "Group - Kids Development",
-
-  // National Development (9-11 ani)
   "Individual Men - National Development",
   "Individual Women - National Development",
   "Mixed Pair - National Development",
   "Trio - National Development",
   "Group - National Development",
-
-  // Youth (12-14 ani)
   "Individual Men - Youth",
   "Individual Women - Youth",
   "Mixed Pair - Youth",
   "Trio - Youth",
   "Group - Youth",
   "Aerobic Dance - Youth",
-
-  // Juniors (15-17 ani)
   "Individual Men - Juniors",
   "Individual Women - Juniors",
   "Mixed Pair - Juniors",
   "Trio - Juniors",
   "Group - Juniors",
   "Aerobic Dance - Juniors",
-
-  // Seniors (18+)
   "Individual Men - Seniors",
   "Individual Women - Seniors",
   "Mixed Pair - Seniors",
@@ -116,7 +107,6 @@ export default function AddCompetitor() {
         { first_name: "", last_name: "", email: "", age: "", sex: "" },
       ]);
     } else if (category.startsWith("Aerobic Dance")) {
-      // Default with 6, but user can add up to 8
       setMembers(
         Array.from({ length: 6 }, () => ({
           first_name: "",
@@ -133,21 +123,21 @@ export default function AddCompetitor() {
     }
   }, [category]);
 
-const addMember = () => {
-  if (category.startsWith("Aerobic Dance") && members.length < 8) {
-    setMembers([
-      ...members,
-      { first_name: "", last_name: "", email: "", age: "", sex: "" },
-    ]);
-  }
-};
+  const addMember = () => {
+    if (category.startsWith("Aerobic Dance") && members.length < 8) {
+      setMembers([
+        ...members,
+        { first_name: "", last_name: "", email: "", age: "", sex: "" },
+      ]);
+    }
+  };
 
-const removeMember = (index: number) => {
-  if (category.startsWith("Aerobic Dance") && members.length <= 6) return; // cannot go below 6
-  const updated = [...members];
-  updated.splice(index, 1);
-  setMembers(updated);
-};
+  const removeMember = (index: number) => {
+    if (category.startsWith("Aerobic Dance") && members.length <= 6) return;
+    const updated = [...members];
+    updated.splice(index, 1);
+    setMembers(updated);
+  };
 
   const updateMember = (index: number, field: keyof Member, value: string) => {
     const updated = [...members];
@@ -232,161 +222,409 @@ const removeMember = (index: number) => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Add Competitor (Team)</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Add New Competitor</Text>
+        <Text style={styles.subtitle}>Register team for competition</Text>
+      </View>
 
-        <View style={styles.pickerWrapper}>
-          <Picker selectedValue={category} onValueChange={setCategory}>
-            <Picker.Item label="Select category..." value="" />
-            {CATEGORIES.map((c) => (
-              <Picker.Item key={c} label={c} value={c} />
-            ))}
-          </Picker>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Competition Details</Text>
+          
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Category</Text>
+            <View style={styles.pickerWrapper}>
+              <Picker selectedValue={category} onValueChange={setCategory}>
+                <Picker.Item label="Select category..." value="" />
+                {CATEGORIES.map((c) => (
+                  <Picker.Item key={c} label={c} value={c} />
+                ))}
+              </Picker>
+            </View>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Club Name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter club name"
+              value={club}
+              onChangeText={setClub}
+              placeholderTextColor="#B2BEC3"
+            />
+          </View>
         </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Club"
-          value={club}
-          onChangeText={setClub}
-        />
-
-        <Text style={styles.subtitle}>Members</Text>
-        {members.map((m, idx) => (
-          <View key={idx} style={styles.memberBox}>
-            <Text style={styles.memberTitle}>Member #{idx + 1}</Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="First name"
-              value={m.first_name}
-              onChangeText={(t) => updateMember(idx, "first_name", t)}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Last name"
-              value={m.last_name}
-              onChangeText={(t) => updateMember(idx, "last_name", t)}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={m.email}
-              onChangeText={(t) => updateMember(idx, "email", t)}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Age"
-              value={m.age}
-              onChangeText={(t) =>
-                updateMember(idx, "age", t.replace(/[^0-9]/g, ""))
-              }
-              keyboardType="numeric"
-            />
-
-            <View style={styles.radioRow}>
-              <Pressable
-                style={[styles.radioBtn, m.sex === "M" && styles.radioSelected]}
-                onPress={() => updateMember(idx, "sex", "M")}
-              >
-                <Text style={styles.radioText}>Male</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.radioBtn, m.sex === "F" && styles.radioSelected]}
-                onPress={() => updateMember(idx, "sex", "F")}
-              >
-                <Text style={styles.radioText}>Female</Text>
-              </Pressable>
+        <View style={styles.formSection}>
+          <View style={styles.membersHeader}>
+            <Text style={styles.sectionTitle}>Team Members</Text>
+            <View style={styles.memberCount}>
+              <Text style={styles.memberCountText}>{members.length}</Text>
             </View>
-
-            {/* Only show remove button for Aerobic Dance AND when member #7 or #8 */}
-            {category.startsWith("Aerobic Dance") &&
-              (idx + 1 === 7 || idx + 1 === 8) && (
-                <Pressable
-                  style={styles.removeBtn}
-                  onPress={() => removeMember(idx)}
-                >
-                  <Text style={styles.removeText}>➖ Remove</Text>
-                </Pressable>
-              )}
           </View>
-        ))}
 
-        {/* Show add button only for Aerobic Dance and if < 8 */}
-        {category.startsWith("Aerobic Dance") && members.length < 8 && (
-          <Pressable style={styles.addBtn} onPress={addMember}>
-            <Text style={styles.addText}>➕ Add Member</Text>
-          </Pressable>
-        )}
+          {members.map((m, idx) => (
+            <View key={idx} style={styles.memberCard}>
+              <View style={styles.memberHeader}>
+                <Text style={styles.memberTitle}>Member #{idx + 1}</Text>
+                {category.startsWith("Aerobic Dance") && (idx + 1 === 7 || idx + 1 === 8) && (
+                  <Pressable
+                    style={styles.removeBtn}
+                    onPress={() => removeMember(idx)}
+                  >
+                    <Text style={styles.removeBtnText}>×</Text>
+                  </Pressable>
+                )}
+              </View>
 
-        {loading ? (
-          <ActivityIndicator size="large" />
-        ) : (
-          <Button title="Create Competitor" onPress={submit} />
-        )}
+              <View style={styles.inputRow}>
+                <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.label}>First Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="First name"
+                    value={m.first_name}
+                    onChangeText={(t) => updateMember(idx, "first_name", t)}
+                    placeholderTextColor="#B2BEC3"
+                  />
+                </View>
+                <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.label}>Last Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Last name"
+                    value={m.last_name}
+                    onChangeText={(t) => updateMember(idx, "last_name", t)}
+                    placeholderTextColor="#B2BEC3"
+                  />
+                </View>
+              </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email address"
+                  value={m.email}
+                  onChangeText={(t) => updateMember(idx, "email", t)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  placeholderTextColor="#B2BEC3"
+                />
+              </View>
+
+              <View style={styles.inputRow}>
+                <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.label}>Age</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Age"
+                    value={m.age}
+                    onChangeText={(t) =>
+                      updateMember(idx, "age", t.replace(/[^0-9]/g, ""))
+                    }
+                    keyboardType="numeric"
+                    placeholderTextColor="#B2BEC3"
+                  />
+                </View>
+                <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.label}>Gender</Text>
+                  <View style={styles.genderRow}>
+                    <Pressable
+                      style={[
+                        styles.genderBtn,
+                        m.sex === "M" && styles.genderBtnSelected,
+                        m.sex === "M" && styles.genderBtnMale,
+                      ]}
+                      onPress={() => updateMember(idx, "sex", "M")}
+                    >
+                      <Text
+                        style={[
+                          styles.genderText,
+                          m.sex === "M" && styles.genderTextSelected,
+                        ]}
+                      >
+                        Male
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.genderBtn,
+                        m.sex === "F" && styles.genderBtnSelected,
+                        m.sex === "F" && styles.genderBtnFemale,
+                      ]}
+                      onPress={() => updateMember(idx, "sex", "F")}
+                    >
+                      <Text
+                        style={[
+                          styles.genderText,
+                          m.sex === "F" && styles.genderTextSelected,
+                        ]}
+                      >
+                        Female
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </View>
+          ))}
+
+          {category.startsWith("Aerobic Dance") && members.length < 8 && (
+            <Pressable style={styles.addMemberBtn} onPress={addMember}>
+              <Text style={styles.addMemberText}>+ Add Member</Text>
+            </Pressable>
+          )}
+        </View>
+
+        <View style={styles.submitSection}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+              <Text style={styles.loadingText}>Creating competitor...</Text>
+            </View>
+          ) : (
+            <Pressable style={styles.submitBtn} onPress={submit}>
+              <Text style={styles.submitBtnText}>Create Competitor</Text>
+            </Pressable>
+          )}
+
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, gap: 12 },
-  title: { fontSize: 22, fontWeight: "700", marginBottom: 8 },
-  subtitle: { fontSize: 18, fontWeight: "600", marginTop: 12 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 10,
+  container: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 32,
+    backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#2D3436',
     marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#636E72',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  scrollContent: {
+    paddingBottom: 32,
+  },
+  formSection: {
+    margin: 24,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#2D3436',
+    marginBottom: 20,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2D3436',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    fontSize: 16,
+    borderWidth: 2,
+    borderColor: '#E1E8ED',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
   },
   pickerWrapper: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#E1E8ED',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  memberBox: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
-    backgroundColor: "#f9f9f9",
+  membersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  memberCount: {
+    backgroundColor: '#6C5CE7',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  memberCountText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  memberCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  memberHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   memberTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 6,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#6C5CE7',
   },
-
-  addBtn: {
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: "#28a745",
-    alignItems: "center",
-    marginVertical: 8,
-  },
-  addText: { color: "#fff", fontWeight: "600" },
   removeBtn: {
+    backgroundColor: '#FF6B6B',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  inputRow: {
+    flexDirection: 'row',
+  },
+  genderRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  genderBtn: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    borderColor: '#E1E8ED',
+    alignItems: 'center',
+  },
+  genderBtnSelected: {
+    borderWidth: 2,
+  },
+  genderBtnMale: {
+    backgroundColor: '#74B9FF',
+    borderColor: '#0984E3',
+  },
+  genderBtnFemale: {
+    backgroundColor: '#FD79A8',
+    borderColor: '#E84393',
+  },
+  genderText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#636E72',
+  },
+  genderTextSelected: {
+    color: '#FFFFFF',
+  },
+  addMemberBtn: {
+    backgroundColor: '#00B894',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
     marginTop: 8,
-    padding: 6,
-    borderRadius: 6,
-    backgroundColor: "#dc3545",
-    alignItems: "center",
   },
-  removeText: { color: "#fff", fontWeight: "600" },
-  radioRow: { flexDirection: "row", gap: 10, marginTop: 6 },
-  radioBtn: {
-    padding: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#aaa",
+  addMemberText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
-  radioSelected: { backgroundColor: "#0077cc", borderColor: "#0077cc" },
-  radioText: { color: "#000" },
-  error: { color: "crimson", marginTop: 10 },
+  submitSection: {
+    paddingHorizontal: 24,
+  },
+  loadingContainer: {
+    backgroundColor: '#6C5CE7',
+    borderRadius: 20,
+    paddingVertical: 20,
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  submitBtn: {
+    backgroundColor: '#6C5CE7',
+    borderRadius: 20,
+    paddingVertical: 20,
+    alignItems: 'center',
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  submitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  errorContainer: {
+    backgroundColor: '#FF7675',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 16,
+  },
+  errorText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });

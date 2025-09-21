@@ -66,3 +66,7 @@ export const fetchAllJudges = async () => {
     db.query(query);
   return result.rows;
 }
+export async function findJudgeById(id: number) {
+  const result = await db.query("SELECT * FROM judges WHERE id = $1", [id]);
+  return result.rows[0] || null;
+}

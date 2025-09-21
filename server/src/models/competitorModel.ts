@@ -151,17 +151,19 @@ export const fetchCompetitorsWithScores = async (category: string) => {
   return Object.values(grouped);
 };
 
-// ✅ Validate competitor
-export const validateCompetitorById = async (competitorId: number) => {
+// ✅ Validate competitor with total_score
+export const validateCompetitorById = async (competitorId: number, totalScore: number) => {
   const client = await db.connect();
   try {
     await client.query("BEGIN");
 
     await client.query(
-      `INSERT INTO validated_competitors (competitor_id) 
-       VALUES ($1)
-       ON CONFLICT (competitor_id) DO NOTHING;`,
-      [competitorId]
+      `INSERT INTO validated_competitors (competitor_id, total_score) 
+       VALUES ($1, $2)
+       ON CONFLICT (competitor_id) DO UPDATE 
+       SET total_score = EXCLUDED.total_score,
+           validated_at = NOW();`,   // update timestamp if re-validated
+      [competitorId, totalScore]
     );
 
     await client.query(
@@ -170,7 +172,7 @@ export const validateCompetitorById = async (competitorId: number) => {
     );
 
     await client.query("COMMIT");
-    return { competitorId, success: true };
+    return { competitorId, totalScore, success: true };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
@@ -184,17 +186,9 @@ export const unvalidateCompetitorById = async (competitorId: number) => {
   try {
     await client.query("BEGIN");
 
-    // Remove from validated_competitors
+    // Remove from validated_competitors only
     await client.query(
       `DELETE FROM validated_competitors WHERE competitor_id = $1;`,
-      [competitorId]
-    );
-
-    // (Optional) put them back into current_vote
-    await client.query(
-      `INSERT INTO current_vote (competitor_id)
-       VALUES ($1)
-       ON CONFLICT (competitor_id) DO NOTHING;`,
       [competitorId]
     );
 
@@ -207,3 +201,8 @@ export const unvalidateCompetitorById = async (competitorId: number) => {
     client.release();
   }
 };
+
+export async function findCompetitorById(id: number) {
+  const result = await db.query("SELECT * FROM competitors WHERE id = $1", [id]);
+  return result.rows[0] || null;
+}

@@ -6,13 +6,31 @@ import {
   fetchCompetitorsWithScores,
   validateCompetitorById,
   unvalidateCompetitorById,
+  findCompetitorById, // 👉 must exist in your models
 } from "../models/competitorModel";
 
-// Create
+import {
+  validateCategory,
+  getExpectedMemberCount,
+  validateCompetitorId,
+  validateTotalScore,
+} from "../utils/validators";
+
+// --- Create competitor ---
 export const createCompetitor = async (req: Request, res: Response) => {
   const { category, club, members } = req.body;
+
   if (!category || !club || !Array.isArray(members)) {
     return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  if (!validateCategory(category, res)) return;
+
+  const [min, max] = getExpectedMemberCount(category);
+  if (members.length < min || members.length > max) {
+    return res.status(400).json({
+      error: `Invalid number of members for ${category}. Expected between ${min} and ${max}.`,
+    });
   }
 
   try {
@@ -24,52 +42,60 @@ export const createCompetitor = async (req: Request, res: Response) => {
   }
 };
 
-// Delete
+// --- Delete competitor ---
 export const deleteCompetitor = async (req: Request, res: Response) => {
-  const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) return res.status(400).json({ error: "Invalid competitor ID" });
+  const competitorId = validateCompetitorId(req.params.id, res);
+  if (competitorId === null) return;
 
   try {
-    const deleted = await deleteCompetitorById(id);
-    if (!deleted) return res.status(404).json({ error: "Not found" });
+    const existing = await findCompetitorById(competitorId);
+    if (!existing) return res.status(404).json({ error: "Competitor not found" });
+
+    const deleted = await deleteCompetitorById(competitorId);
     res.json(deleted);
   } catch (err) {
+    console.error("Error deleting competitor:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };
 
-// List all
+// --- List all competitors ---
 export const getAllcompetitors = async (_req: Request, res: Response) => {
   try {
     const competitors = await getAllCompetitors();
     res.json(competitors);
   } catch (err) {
+    console.error("Error fetching competitors:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };
 
-// List by category with scores + validation
+// --- List competitors by category ---
 export const getCompetitorsByCategory = async (req: Request, res: Response) => {
-  try {
-    const category = req.query.category as string;
-    if (!category) return res.status(400).json({ error: "Category required" });
+  const category = req.query.category as string;
+  if (!category) return res.status(400).json({ error: "Category required" });
+  if (!validateCategory(category, res)) return;
 
+  try {
     const competitors = await fetchCompetitorsWithScores(category);
     res.json(competitors);
   } catch (err) {
+    console.error("Error fetching by category:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };
 
-// Validate competitor
+// --- Validate competitor ---
 export const validateCompetitor = async (req: Request, res: Response) => {
-  const competitorId = parseInt(req.params.id, 10);
-  if (isNaN(competitorId)) {
-    return res.status(400).json({ error: "Invalid competitor ID" });
-  }
+  const competitorId = validateCompetitorId(req.params.id, res);
+  const totalScore = validateTotalScore(req.body.totalScore, res);
+  if (competitorId === null || totalScore === null) return;
 
   try {
-    const result = await validateCompetitorById(competitorId);
+    const existing = await findCompetitorById(competitorId);
+    if (!existing) return res.status(404).json({ error: "Competitor not found" });
+
+    const result = await validateCompetitorById(competitorId, totalScore);
     res.json({ message: "Competitor validated", ...result });
   } catch (err) {
     console.error("Error validating competitor:", err);
@@ -77,13 +103,15 @@ export const validateCompetitor = async (req: Request, res: Response) => {
   }
 };
 
+// --- Unvalidate competitor ---
 export const unvalidateCompetitor = async (req: Request, res: Response) => {
-  const competitorId = parseInt(req.params.id, 10);
-  if (isNaN(competitorId)) {
-    return res.status(400).json({ error: "Invalid competitor ID" });
-  }
+  const competitorId = validateCompetitorId(req.params.id, res);
+  if (competitorId === null) return;
 
   try {
+    const existing = await findCompetitorById(competitorId);
+    if (!existing) return res.status(404).json({ error: "Competitor not found" });
+
     const result = await unvalidateCompetitorById(competitorId);
     res.json({ message: "Competitor unvalidated", ...result });
   } catch (err) {
