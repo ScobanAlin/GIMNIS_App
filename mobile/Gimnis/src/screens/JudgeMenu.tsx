@@ -13,8 +13,13 @@ import {
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../App";
+import type { RootStackParamList } from "../types";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BASE_URL } from "../config";
+
+const ROLE_KEY = "tablet_role";
+const JUDGE_ID_KEY = "judge_id";
+const JUDGE_NAME_KEY = "judge_name";
 
 type Member = {
   id: number;
@@ -62,6 +67,23 @@ export default function JudgeMenu() {
   const [loading, setLoading] = useState(true);
   const [currentCompetitor, setCurrentCompetitor] = useState<CurrentCompetitor>(null);
   const [scores, setScores] = useState<Record<string, string>>({});
+  const [tapCount, setTapCount] = useState(0);
+
+const handleTitlePress = async () => {
+  const newCount = tapCount + 1;
+  setTapCount(newCount);
+
+  // reset after 5 seconds if not completed
+  if (newCount === 1) {
+    setTimeout(() => setTapCount(0), 5000);
+  }
+
+  if (newCount >= 7) {
+    setTapCount(0);
+    await AsyncStorage.multiRemove([ROLE_KEY, JUDGE_ID_KEY, JUDGE_NAME_KEY]);
+    navigation.replace("RolePicker");
+  }
+};
 
   const fetchCurrentCompetitor = async () => {
     try {
@@ -317,7 +339,8 @@ const voteCompetitor = async () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View
+      <Pressable
+        onPress={handleTitlePress}
         style={[styles.header, { backgroundColor: getRoleColor(judgeRole) }]}
       >
         <View style={styles.headerContent}>
@@ -325,13 +348,14 @@ const voteCompetitor = async () => {
             <Text style={styles.roleIcon}>{getRoleIcon(judgeRole)}</Text>
           </View>
           <View style={styles.headerText}>
+            {/* 👇 Show actual judge role instead of “Judge Judge” */}
             <Text style={styles.title}>
               {judgeRole.charAt(0).toUpperCase() + judgeRole.slice(1)} Judge
             </Text>
             <Text style={styles.subtitle}>{name}</Text>
           </View>
         </View>
-      </View>
+      </Pressable>
 
       <ScrollView
         style={styles.scrollContainer}

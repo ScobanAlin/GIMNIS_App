@@ -11,8 +11,9 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../App";
+import type { RootStackParamList } from "../types";
 import { BASE_URL } from "../config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Judge = {
   id: number;
@@ -21,12 +22,15 @@ type Judge = {
   role: string;
 };
 
+const ROLE_KEY = "tablet_role";
+
 export default function JudgePicker() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [loading, setLoading] = useState(true);
   const [judges, setJudges] = useState<Judge[]>([]);
+  const [tapCount, setTapCount] = useState(0);
 
   const fetchJudges = async () => {
     try {
@@ -56,30 +60,58 @@ export default function JudgePicker() {
     });
   };
 
+const handleTitlePress = async () => {
+  const newCount = tapCount + 1;
+  setTapCount(newCount);
+
+  // reset after 5 seconds if not completed
+  if (newCount === 1) {
+    setTimeout(() => setTapCount(0), 5000);
+  }
+
+  if (newCount >= 7) {
+    setTapCount(0);
+    await AsyncStorage.removeItem(ROLE_KEY); // reset saved role
+    navigation.replace("RolePicker");
+  }
+};
+
   const getRoleColor = (role: string) => {
     switch (role.toLowerCase()) {
-      case 'execution': return '#FF6B6B';
-      case 'artistry': return '#4ECDC4';
-      case 'difficulty': return '#45B7D1';
-      case 'principal': return '#96CEB4';
-      default: return '#FFEAA7';
+      case "execution":
+        return "#FF6B6B";
+      case "artistry":
+        return "#4ECDC4";
+      case "difficulty":
+        return "#45B7D1";
+      case "principal":
+        return "#96CEB4";
+      default:
+        return "#FFEAA7";
     }
   };
 
   const getRoleIcon = (role: string) => {
     switch (role.toLowerCase()) {
-      case 'execution': return '⚡';
-      case 'artistry': return '🎨';
-      case 'difficulty': return '🎯';
-      case 'principal': return '👑';
-      default: return '⭐';
+      case "execution":
+        return "⚡";
+      case "artistry":
+        return "🎨";
+      case "difficulty":
+        return "🎯";
+      case "principal":
+        return "👑";
+      default:
+        return "⭐";
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Select Your Role</Text>
+        <Pressable onPress={handleTitlePress}>
+          <Text style={styles.title}>Select Your Role</Text>
+        </Pressable>
         <Text style={styles.subtitle}>Choose your judging position</Text>
       </View>
 
@@ -94,20 +126,34 @@ export default function JudgePicker() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <Pressable
-              style={[styles.card, { borderLeftColor: getRoleColor(item.role) }]}
+              style={[
+                styles.card,
+                { borderLeftColor: getRoleColor(item.role) },
+              ]}
               onPress={() => handleSelectJudge(item)}
-              android_ripple={{ color: 'rgba(108, 92, 231, 0.1)' }}
+              android_ripple={{ color: "rgba(108, 92, 231, 0.1)" }}
             >
               <View style={styles.cardContent}>
-                <View style={[styles.iconContainer, { backgroundColor: getRoleColor(item.role) }]}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    { backgroundColor: getRoleColor(item.role) },
+                  ]}
+                >
                   <Text style={styles.roleIcon}>{getRoleIcon(item.role)}</Text>
                 </View>
                 <View style={styles.textContainer}>
                   <Text style={styles.judgeName}>
                     {item.first_name} {item.last_name}
                   </Text>
-                  <Text style={[styles.roleText, { color: getRoleColor(item.role) }]}>
-                    {item.role.charAt(0).toUpperCase() + item.role.slice(1)} Judge
+                  <Text
+                    style={[
+                      styles.roleText,
+                      { color: getRoleColor(item.role) },
+                    ]}
+                  >
+                    {item.role.charAt(0).toUpperCase() + item.role.slice(1)}{" "}
+                    Judge
                   </Text>
                 </View>
                 <View style={styles.arrowContainer}>
@@ -128,16 +174,16 @@ export default function JudgePicker() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: "#F8F9FA",
   },
   header: {
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -145,53 +191,53 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: '800',
-    color: '#2D3436',
+    fontWeight: "800",
+    color: "#2D3436",
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    color: '#636E72',
-    textAlign: 'center',
-    fontWeight: '500',
+    color: "#636E72",
+    textAlign: "center",
+    fontWeight: "500",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     gap: 16,
   },
   loadingText: {
     fontSize: 16,
-    color: '#636E72',
-    fontWeight: '500',
+    color: "#636E72",
+    fontWeight: "500",
   },
   listContainer: {
     padding: 24,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     paddingVertical: 20,
     paddingHorizontal: 20,
     borderLeftWidth: 6,
-    shadowColor: '#6C5CE7',
+    shadowColor: "#6C5CE7",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 12,
   },
   cardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   iconContainer: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 16,
   },
   roleIcon: {
@@ -202,23 +248,23 @@ const styles = StyleSheet.create({
   },
   judgeName: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#2D3436',
+    fontWeight: "700",
+    color: "#2D3436",
     marginBottom: 4,
   },
   roleText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   arrowContainer: {
     width: 32,
     height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   arrow: {
     fontSize: 20,
-    color: '#B2BEC3',
-    fontWeight: 'bold',
+    color: "#B2BEC3",
+    fontWeight: "bold",
   },
 });

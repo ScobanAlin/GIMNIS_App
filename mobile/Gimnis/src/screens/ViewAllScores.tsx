@@ -340,7 +340,7 @@ export default function ViewAllScores() {
               ...prev,
               scores: {
                 ...prev.scores,
-                [editingJudge.judge]: Number(editingJudge.value),
+                [editingJudge.judge]: Number(editingJudge.value).toFixed(1),
               },
             }
           : prev
@@ -549,6 +549,29 @@ export default function ViewAllScores() {
                   </Pressable>
                 </View>
 
+                {/* NEW: Scores counter */}
+                <View style={{ marginBottom: 12, alignItems: "center" }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "600",
+                      color: "#636E72",
+                    }}
+                  >
+                    {
+                      Object.values(selectedCompetitor.scores || {}).filter(
+                        (v) =>
+                          v !== null &&
+                          v !== undefined &&
+                          v !== "" &&
+                          v !== "N/A"
+                      ).length
+                    }{" "}
+                    / {14}{" "}
+                    scores submitted
+                  </Text>
+                </View>
+
                 <Text style={styles.modalSubTitle}>
                   {selectedCompetitor.club} • {selectedCompetitor.category}
                 </Text>
@@ -628,7 +651,9 @@ export default function ViewAllScores() {
                                     },
                                   ]}
                                 >
-                                  <Text style={styles.scoreValue}>{value}</Text>
+                                  <Text style={styles.scoreValue}>
+                                    {Number(value).toFixed(1)}
+                                  </Text>
                                 </View>
                               </View>
 

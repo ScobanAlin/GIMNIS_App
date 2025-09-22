@@ -206,3 +206,16 @@ export async function findCompetitorById(id: number) {
   const result = await db.query("SELECT * FROM competitors WHERE id = $1", [id]);
   return result.rows[0] || null;
 }
+
+export const countCompetitors = async () => {
+  const result = await db.query("SELECT COUNT(*) AS total FROM competitors");
+  return parseInt(result.rows[0].total, 10);
+};
+
+// Count distinct categories
+export const countCategories = async () => {
+  const result = await db.query(
+    "SELECT COUNT(DISTINCT category) AS categories FROM competitors"
+  );
+  return parseInt(result.rows[0].categories, 10);
+};

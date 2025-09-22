@@ -17,4 +17,8 @@ export type RootStackParamList = {
   };
   ViewAllScores: undefined;
   JudgePicker: undefined;
+  JudgeLoginScreen: {
+    judgeId: number;
+    role: string;
+  };
 };

@@ -1,36 +1,69 @@
-import React from "react";
-import { SafeAreaView, View, Text, Pressable, StyleSheet } from "react-native";
+import React, { useState } from "react";
+import {
+  SafeAreaView,
+  Text,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  Alert,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../App"; // adjust if types are elsewhere
+import type { RootStackParamList } from "../../App";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const ROLE_KEY = "tablet_role";
+const JUDGE_ID_KEY = "judge_id";
 
 export default function RolePicker() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
+  const [judgeId, setJudgeId] = useState("");
+
+  const chooseRole = async (role: string, screen: keyof RootStackParamList) => {
+    await AsyncStorage.setItem(ROLE_KEY, role);
+
+    if (role === "Judge") {
+      if (!judgeId) {
+        Alert.alert("Error", "Please enter Judge ID");
+        return;
+      }
+      await AsyncStorage.setItem(JUDGE_ID_KEY, judgeId);
+
+      navigation.replace("JudgeLoginScreen", {
+        judgeId: parseInt(judgeId, 10),
+        role,
+      });
+    } else {
+      navigation.replace(screen as any, { role });
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Select Role (dev mode)</Text>
+      <Text style={styles.title}>Select Role</Text>
 
       <Pressable
         style={styles.btn}
-        onPress={() => navigation.navigate("SecretaryMenu")}
+        onPress={() => chooseRole("Secretary", "SecretaryMenu")}
       >
         <Text style={styles.btnText}>📝 Secretary</Text>
       </Pressable>
 
+      {/* Judge role: requires Judge ID */}
+      <TextInput
+        style={styles.input}
+        placeholder="Enter Judge ID"
+        keyboardType="numeric"
+        value={judgeId}
+        onChangeText={setJudgeId}
+      />
       <Pressable
         style={styles.btn}
-        onPress={() => navigation.navigate("JudgePicker")}
+        onPress={() => chooseRole("Judge", "JudgeMenu")}
       >
-        <Text style={styles.btnText}>⚖️ Judge</Text>
-      </Pressable>
-
-      <Pressable
-        style={styles.btn}
-        onPress={() => navigation.navigate("PrincipalJudgeMenu")}
-      >
-        <Text style={styles.btnText}>👑 Principal Judge</Text>
+        <Text style={styles.btnText}>⚖️ Judge / Principal Judge</Text>
       </Pressable>
     </SafeAreaView>
   );
@@ -52,6 +85,17 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     backgroundColor: "#f7f7f7",
     width: 220,
+    marginBottom: 10,
   },
   btnText: { fontSize: 18, textAlign: "center" },
+  input: {
+    width: 220,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    backgroundColor: "#fff",
+    textAlign: "center",
+  },
 });

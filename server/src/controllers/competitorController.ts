@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import {
+  countCompetitors,
+  countCategories,
   insertCompetitor,
   deleteCompetitorById,
   getAllCompetitors,
@@ -117,5 +119,26 @@ export const unvalidateCompetitor = async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Error unvalidating competitor:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getCompetitorCount = async (_req: Request, res: Response) => {
+  try {
+    const total = await countCompetitors();
+    res.json({ total });
+  } catch (error: any) {
+    console.error("Error fetching competitor count:", error);
+    res.status(500).json({ error: "Failed to fetch competitor count" });
+  }
+};
+
+// 📊 Distinct categories
+export const getCategoryCount = async (_req: Request, res: Response) => {
+  try {
+    const categories = await countCategories();
+    res.json({ categories });
+  } catch (error: any) {
+    console.error("Error fetching category count:", error);
+    res.status(500).json({ error: "Failed to fetch category count" });
   }
 };

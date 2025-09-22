@@ -1,12 +1,69 @@
-import React from "react";
-import { View, Text, Pressable, StyleSheet, SafeAreaView } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  SafeAreaView,
+  ActivityIndicator,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../App";
+import type { RootStackParamList } from "../types";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BASE_URL } from "../config";
 
+const ROLE_KEY = "tablet_role";
+const JUDGE_ID_KEY = "judge_id";
+const JUDGE_NAME_KEY = "judge_name";
 export default function SecretaryMenu() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  const [tapCount, setTapCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ total: 0, categories: 0 });
+
+  const handleTitlePress = async () => {
+    const newCount = tapCount + 1;
+    setTapCount(newCount);
+
+    // reset after 5 seconds if not completed
+    if (newCount === 1) {
+      setTimeout(() => setTapCount(0), 5000);
+    }
+
+    if (newCount >= 7) {
+      setTapCount(0);
+      await AsyncStorage.multiRemove([ROLE_KEY, JUDGE_ID_KEY, JUDGE_NAME_KEY]);
+      navigation.replace("RolePicker");
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const [resCompetitors, resCategories] = await Promise.all([
+        fetch(`${BASE_URL}/api/competitors/count`),
+        fetch(`${BASE_URL}/api/competitors/categories/count`),
+      ]);
+
+      const competitorsData = await resCompetitors.json();
+      const categoriesData = await resCategories.json();
+
+      setStats({
+        total: competitorsData.total || 0,
+        categories: categoriesData.categories || 0,
+      });
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   const menuItems = [
     {
@@ -28,18 +85,15 @@ export default function SecretaryMenu() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Secretary Dashboard</Text>
+        <Pressable onPress={handleTitlePress}>
+          <Text style={styles.title}>Secretary Dashboard</Text>
+        </Pressable>
         <Text style={styles.subtitle}>Manage competition entries</Text>
       </View>
 
       <View style={styles.content}>
         {menuItems.map((item, index) => (
-          <Pressable
-            key={index}
-            style={styles.menuCard}
-            onPress={item.action}
-            android_ripple={{ color: "rgba(255, 255, 255, 0.3)" }}
-          >
+          <Pressable key={index} style={styles.menuCard} onPress={item.action}>
             <View
               style={[
                 styles.cardBackground,
@@ -63,16 +117,20 @@ export default function SecretaryMenu() {
 
         <View style={styles.statsContainer}>
           <Text style={styles.statsTitle}>Quick Stats</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>--</Text>
-              <Text style={styles.statLabel}>Total Competitors</Text>
+          {loading ? (
+            <ActivityIndicator size="large" color="#6C5CE7" />
+          ) : (
+            <View style={styles.statsRow}>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{stats.total}</Text>
+                <Text style={styles.statLabel}>Total Competitors</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{stats.categories}</Text>
+                <Text style={styles.statLabel}>Categories</Text>
+              </View>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>--</Text>
-              <Text style={styles.statLabel}>Categories</Text>
-            </View>
-          </View>
+          )}
         </View>
       </View>
     </SafeAreaView>

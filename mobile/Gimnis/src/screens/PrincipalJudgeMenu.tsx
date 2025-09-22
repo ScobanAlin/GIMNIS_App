@@ -13,8 +13,9 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../App";
+import type { RootStackParamList } from "../types";
 import { BASE_URL } from "../config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Member = {
   id: number;
@@ -33,6 +34,9 @@ type CurrentCompetitor = {
   members: Member[];
 } | null;
 
+const ROLE_KEY = "tablet_role";
+const JUDGE_ID_KEY = "judge_id";
+const JUDGE_NAME_KEY = "judge_name";
 export default function PrincipalJudgeMenu() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -42,6 +46,7 @@ export default function PrincipalJudgeMenu() {
     useState<CurrentCompetitor>(null);
   const [linePenalty, setLinePenalty] = useState("");
   const [principalPenalty, setPrincipalPenalty] = useState("");
+  const [tapCount, setTapCount] = useState(0);
 
   // TODO: Replace with logged-in principal judge ID
   const judgeId = 1;
@@ -75,6 +80,22 @@ export default function PrincipalJudgeMenu() {
       setLoading(false);
     }
   };
+
+const handleTitlePress = async () => {
+  const newCount = tapCount + 1;
+  setTapCount(newCount);
+
+  // reset after 5 seconds if not completed
+  if (newCount === 1) {
+    setTimeout(() => setTapCount(0), 5000);
+  }
+
+  if (newCount >= 7) {
+    setTapCount(0);
+    await AsyncStorage.multiRemove([ROLE_KEY, JUDGE_ID_KEY, JUDGE_NAME_KEY]);
+    navigation.replace("RolePicker");
+  }
+};
 
   const handleScoreChange = (type: "line" | "principal", value: string) => {
     let sanitized = value.replace(/[^0-9.]/g, "");
@@ -176,7 +197,9 @@ export default function PrincipalJudgeMenu() {
             <Text style={styles.crownIcon}>👑</Text>
           </View>
           <View style={styles.headerText}>
-            <Text style={styles.title}>Principal Judge</Text>
+            <Pressable onPress={handleTitlePress}>
+              <Text style={styles.title}>Principal Judge</Text>
+            </Pressable>
             <Text style={styles.subtitle}>Competition Authority</Text>
           </View>
         </View>
@@ -544,6 +567,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 24,
-    paddingBottom: 40, // Extra padding at bottom to ensure submit button is visible
+    paddingBottom: 40,
   },
 });

@@ -59,14 +59,28 @@ export const fetchAllJudges = async () => {
       last_name,
       role
     FROM judges
-    WHERE role != 'principal'
     ORDER BY role, last_name, first_name;
   `;
-  const result = await
-    db.query(query);
+  const result = await db.query(query);
   return result.rows;
-}
+};
+
 export async function findJudgeById(id: number) {
   const result = await db.query("SELECT * FROM judges WHERE id = $1", [id]);
+  return result.rows[0] || null;
+}
+
+export async function updateJudgeName(
+  id: number,
+  firstName: string,
+  lastName: string
+) {
+  const query = `
+    UPDATE judges
+    SET first_name = $1, last_name = $2
+    WHERE id = $3
+    RETURNING id, first_name, last_name, role
+  `;
+  const result = await db.query(query, [firstName, lastName, id]);
   return result.rows[0] || null;
 }
