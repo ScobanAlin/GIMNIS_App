@@ -13,7 +13,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../types";
 import { BASE_URL } from "../config";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storage } from "../utils/storage"; // ✅ MMKV wrapper
 
 type Judge = {
   id: number;
@@ -60,21 +60,21 @@ export default function JudgePicker() {
     });
   };
 
-const handleTitlePress = async () => {
-  const newCount = tapCount + 1;
-  setTapCount(newCount);
+  const handleTitlePress = () => {
+    const newCount = tapCount + 1;
+    setTapCount(newCount);
 
-  // reset after 5 seconds if not completed
-  if (newCount === 1) {
-    setTimeout(() => setTapCount(0), 5000);
-  }
+    // reset after 5 seconds if not completed
+    if (newCount === 1) {
+      setTimeout(() => setTapCount(0), 5000);
+    }
 
-  if (newCount >= 7) {
-    setTapCount(0);
-    await AsyncStorage.removeItem(ROLE_KEY); // reset saved role
-    navigation.replace("RolePicker");
-  }
-};
+    if (newCount >= 7) {
+      setTapCount(0);
+      storage.delete(ROLE_KEY); // ✅ MMKV clear role
+      navigation.replace("RolePicker");
+    }
+  };
 
   const getRoleColor = (role: string) => {
     switch (role.toLowerCase()) {
@@ -172,10 +172,7 @@ const handleTitlePress = async () => {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8F9FA",
-  },
+  container: { flex: 1, backgroundColor: "#F8F9FA" },
   header: {
     paddingHorizontal: 24,
     paddingTop: 20,
@@ -208,14 +205,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 16,
   },
-  loadingText: {
-    fontSize: 16,
-    color: "#636E72",
-    fontWeight: "500",
-  },
-  listContainer: {
-    padding: 24,
-  },
+  loadingText: { fontSize: 16, color: "#636E72", fontWeight: "500" },
+  listContainer: { padding: 24 },
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
@@ -228,10 +219,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 12,
   },
-  cardContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  cardContent: { flexDirection: "row", alignItems: "center" },
   iconContainer: {
     width: 56,
     height: 56,
@@ -240,31 +228,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 16,
   },
-  roleIcon: {
-    fontSize: 24,
-  },
-  textContainer: {
-    flex: 1,
-  },
+  roleIcon: { fontSize: 24 },
+  textContainer: { flex: 1 },
   judgeName: {
     fontSize: 20,
     fontWeight: "700",
     color: "#2D3436",
     marginBottom: 4,
   },
-  roleText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  roleText: { fontSize: 16, fontWeight: "600" },
   arrowContainer: {
     width: 32,
     height: 32,
     justifyContent: "center",
     alignItems: "center",
   },
-  arrow: {
-    fontSize: 20,
-    color: "#B2BEC3",
-    fontWeight: "bold",
-  },
+  arrow: { fontSize: 20, color: "#B2BEC3", fontWeight: "bold" },
 });

@@ -14,8 +14,8 @@ import {
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../types";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BASE_URL } from "../config";
+import { storage } from "../utils/storage"; // ✅ switched to MMKV
 
 const ROLE_KEY = "tablet_role";
 const JUDGE_ID_KEY = "judge_id";
@@ -52,7 +52,8 @@ const requiredFields: Record<string, string[]> = {
 };
 
 export default function JudgeMenu() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute();
   const {
     judgeId,
@@ -65,29 +66,34 @@ export default function JudgeMenu() {
   };
 
   const [loading, setLoading] = useState(true);
-  const [currentCompetitor, setCurrentCompetitor] = useState<CurrentCompetitor>(null);
+  const [currentCompetitor, setCurrentCompetitor] =
+    useState<CurrentCompetitor>(null);
   const [scores, setScores] = useState<Record<string, string>>({});
   const [tapCount, setTapCount] = useState(0);
 
-const handleTitlePress = async () => {
-  const newCount = tapCount + 1;
-  setTapCount(newCount);
+  const handleTitlePress = () => {
+    const newCount = tapCount + 1;
+    setTapCount(newCount);
 
-  // reset after 5 seconds if not completed
-  if (newCount === 1) {
-    setTimeout(() => setTapCount(0), 5000);
-  }
+    // reset after 5 seconds if not completed
+    if (newCount === 1) {
+      setTimeout(() => setTapCount(0), 5000);
+    }
 
-  if (newCount >= 7) {
-    setTapCount(0);
-    await AsyncStorage.multiRemove([ROLE_KEY, JUDGE_ID_KEY, JUDGE_NAME_KEY]);
-    navigation.replace("RolePicker");
-  }
-};
+    if (newCount >= 7) {
+      setTapCount(0);
+      storage.delete(ROLE_KEY);
+      storage.delete(JUDGE_ID_KEY);
+      storage.delete(JUDGE_NAME_KEY);
+      navigation.replace("RolePicker");
+    }
+  };
 
   const fetchCurrentCompetitor = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/votes/current?judge_id=${judgeId}`);
+      const res = await fetch(
+        `${BASE_URL}/api/votes/current?judge_id=${judgeId}`
+      );
       const text = await res.text();
       if (!res.ok) throw new Error(`Failed (${res.status})`);
       const data = JSON.parse(text);
@@ -146,74 +152,72 @@ const handleTitlePress = async () => {
     );
   };
 
-const voteCompetitor = async () => {
-  if (!currentCompetitor) return;
-  try {
-    const payloads = Object.entries(scores)
-      .filter(([, v]) => v && !isNaN(Number(v)))
-      .map(([score_type, value]) => {
-        let finalValue = parseFloat(value);
-        if (score_type === "execution_penalization") {
+  const voteCompetitor = async () => {
+    if (!currentCompetitor) return;
+    try {
+      const payloads = Object.entries(scores)
+        .filter(([, v]) => v && !isNaN(Number(v)))
+        .map(([score_type, value]) => {
+          let finalValue = parseFloat(value);
+          if (score_type === "execution_penalization") {
+            return {
+              competitor_id: currentCompetitor.competitor_id,
+              judge_id: judgeId,
+              score_type: "execution",
+              value: 10 - finalValue,
+            };
+          }
           return {
             competitor_id: currentCompetitor.competitor_id,
             judge_id: judgeId,
-            score_type: "execution",
-            value: 10 - finalValue,
+            score_type,
+            value: finalValue,
           };
-        }
-        return {
-          competitor_id: currentCompetitor.competitor_id,
-          judge_id: judgeId,
-          score_type,
-          value: finalValue,
-        };
-      });
+        });
 
-    // 🔥 If difficulty judge → fetch all difficulty judges from API
-    let difficultyJudgeIds: number[] = [];
-    if (judgeRole === "difficulty") {
-      const res = await fetch(`${BASE_URL}/api/judges`);
-      if (!res.ok) throw new Error("Could not fetch judges list");
-      const allJudges = await res.json();
+      // 🔥 If difficulty judge → fetch all difficulty judges from API
+      let difficultyJudgeIds: number[] = [];
+      if (judgeRole === "difficulty") {
+        const res = await fetch(`${BASE_URL}/api/judges`);
+        if (!res.ok) throw new Error("Could not fetch judges list");
+        const allJudges = await res.json();
 
-      difficultyJudgeIds = allJudges
-        .filter((j: any) => j.role === "difficulty" && j.id !== judgeId)
-        .map((j: any) => j.id);
-    }
+        difficultyJudgeIds = allJudges
+          .filter((j: any) => j.role === "difficulty" && j.id !== judgeId)
+          .map((j: any) => j.id);
+      }
 
-    for (const p of payloads) {
-      // Always submit my own
-      const res = await fetch(`${BASE_URL}/api/scores`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(p),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to submit score");
-
-      // If difficulty judge → clone for others
-      for (const diffJudgeId of difficultyJudgeIds) {
-        const cloned = { ...p, judge_id: diffJudgeId };
-        const res2 = await fetch(`${BASE_URL}/api/scores`, {
+      for (const p of payloads) {
+        // Always submit my own
+        const res = await fetch(`${BASE_URL}/api/scores`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(cloned),
+          body: JSON.stringify(p),
         });
-        const data2 = await res2.json();
-        if (!res2.ok)
-          throw new Error(data2?.error || "Failed to submit mirrored score");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Failed to submit score");
+
+        // If difficulty judge → clone for others
+        for (const diffJudgeId of difficultyJudgeIds) {
+          const cloned = { ...p, judge_id: diffJudgeId };
+          const res2 = await fetch(`${BASE_URL}/api/scores`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(cloned),
+          });
+          const data2 = await res2.json();
+          if (!res2.ok)
+            throw new Error(data2?.error || "Failed to submit mirrored score");
+        }
       }
+
+      Alert.alert("Success", "Your scores have been submitted!");
+      setScores({});
+      fetchCurrentCompetitor();
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Could not submit score(s)");
     }
-
-    Alert.alert("Success", "Your scores have been submitted!");
-    setScores({});
-    fetchCurrentCompetitor();
-  } catch (err: any) {
-    Alert.alert("Error", err.message || "Could not submit score(s)");
-  }
-};
-
-
+  };
 
   useEffect(() => {
     fetchCurrentCompetitor();
@@ -223,21 +227,31 @@ const voteCompetitor = async () => {
 
   const getRoleColor = (role: string) => {
     switch (role.toLowerCase()) {
-      case 'execution': return '#FF6B6B';
-      case 'artistry': return '#4ECDC4';
-      case 'difficulty': return '#45B7D1';
-      case 'principal': return '#96CEB4';
-      default: return '#FFEAA7';
+      case "execution":
+        return "#FF6B6B";
+      case "artistry":
+        return "#4ECDC4";
+      case "difficulty":
+        return "#45B7D1";
+      case "principal":
+        return "#96CEB4";
+      default:
+        return "#FFEAA7";
     }
   };
 
   const getRoleIcon = (role: string) => {
     switch (role.toLowerCase()) {
-      case 'execution': return '⚡';
-      case 'artistry': return '🎨';
-      case 'difficulty': return '🎯';
-      case 'principal': return '👑';
-      default: return '⭐';
+      case "execution":
+        return "⚡";
+      case "artistry":
+        return "🎨";
+      case "difficulty":
+        return "🎯";
+      case "principal":
+        return "👑";
+      default:
+        return "⭐";
     }
   };
 
@@ -263,7 +277,9 @@ const voteCompetitor = async () => {
               placeholder="0.0"
               keyboardType="numeric"
               value={scores["principal_penalization"] || ""}
-              onChangeText={(t) => handleScoreChange("principal_penalization", t)}
+              onChangeText={(t) =>
+                handleScoreChange("principal_penalization", t)
+              }
               placeholderTextColor="#B2BEC3"
             />
           </View>
@@ -290,7 +306,9 @@ const voteCompetitor = async () => {
               placeholder="0.0"
               keyboardType="numeric"
               value={scores["difficulty_penalization"] || ""}
-              onChangeText={(t) => handleScoreChange("difficulty_penalization", t)}
+              onChangeText={(t) =>
+                handleScoreChange("difficulty_penalization", t)
+              }
               placeholderTextColor="#B2BEC3"
             />
           </View>
@@ -308,7 +326,9 @@ const voteCompetitor = async () => {
               placeholder="0.0"
               keyboardType="numeric"
               value={scores["execution_penalization"] || ""}
-              onChangeText={(t) => handleScoreChange("execution_penalization", t)}
+              onChangeText={(t) =>
+                handleScoreChange("execution_penalization", t)
+              }
               placeholderTextColor="#B2BEC3"
             />
           </View>
@@ -322,7 +342,9 @@ const voteCompetitor = async () => {
       return (
         <View style={styles.scoreInputsContainer}>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>{judgeRole.charAt(0).toUpperCase() + judgeRole.slice(1)} Score</Text>
+            <Text style={styles.inputLabel}>
+              {judgeRole.charAt(0).toUpperCase() + judgeRole.slice(1)} Score
+            </Text>
             <TextInput
               style={styles.scoreInput}
               placeholder="0.0"

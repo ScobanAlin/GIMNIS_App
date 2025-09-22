@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useRoute, RouteProp } from "@react-navigation/native";
 import { BASE_URL } from "../config";
-import type { RootStackParamList } from "../../App";
+import type { RootStackParamList } from "../types";
 
 type Member = {
   id: number;
@@ -72,6 +72,7 @@ export default function MyScores() {
   const [allScores, setAllScores] = useState<Score[]>([]);
   const [scores, setScores] = useState<Score[]>([]);
   const [loading, setLoading] = useState(false);
+const [competitorSearch, setCompetitorSearch] = useState("");
 
   const fetchScores = useCallback(async () => {
     try {
@@ -143,6 +144,21 @@ export default function MyScores() {
   const totalScores = allScores.length;
   const uniqueCategories = new Set(allScores.map(s => s.category)).size;
 
+const filteredScores = scores.filter((s) => {
+  const searchLower = competitorSearch.toLowerCase();
+  return (
+    s.club.toLowerCase().includes(searchLower) ||
+    s.category.toLowerCase().includes(searchLower) ||
+    String(s.competitor_id).includes(searchLower) ||
+    s.members.some(
+      (m) =>
+        m.first_name.toLowerCase().includes(searchLower) ||
+        m.last_name.toLowerCase().includes(searchLower)
+    )
+  );
+});
+
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={[styles.header, { backgroundColor: getRoleColor(role) }]}>
@@ -212,6 +228,16 @@ export default function MyScores() {
           ))}
         </ScrollView>
 
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search competitors..."
+            value={competitorSearch}
+            onChangeText={setCompetitorSearch}
+            placeholderTextColor="#B2BEC3"
+          />
+        </View>
+
         <ScrollView
           style={styles.scoresContainer}
           showsVerticalScrollIndicator={false}
@@ -233,7 +259,7 @@ export default function MyScores() {
           )}
 
           {!loading &&
-            scores.map((s) => (
+            filteredScores.map((s) => (
               <View key={s.id} style={styles.scoreCard}>
                 <View style={styles.scoreHeader}>
                   <Text style={styles.competitorId}>#{s.competitor_id}</Text>

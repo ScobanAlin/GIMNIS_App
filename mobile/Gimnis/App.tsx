@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, View } from "react-native";
 
 import { RootStackParamList } from "./src/types";
@@ -18,6 +17,7 @@ import JudgePicker from "./src/screens/JudgePicker";
 import JudgeLoginScreen from "./src/screens/JudgeLoginScreen";
 
 import { navigationRef } from "./src/navigationRef";
+import { storage } from "./src/utils/storage"; // ✅ MMKV wrapper
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -37,11 +37,11 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadRole = async () => {
+    const loadRole = () => {
       try {
-        const role = await AsyncStorage.getItem(ROLE_KEY);
-        const judgeIdStr = await AsyncStorage.getItem(JUDGE_ID_KEY);
-        const judgeName = await AsyncStorage.getItem(JUDGE_NAME_KEY);
+        const role = storage.getString(ROLE_KEY);
+        const judgeIdStr = storage.getString(JUDGE_ID_KEY);
+        const judgeName = storage.getString(JUDGE_NAME_KEY);
 
         if (!role) {
           navigationRef.current?.reset({
@@ -97,7 +97,7 @@ export default function App() {
           });
         }
       } catch (err) {
-        console.error("Error loading AsyncStorage", err);
+        console.error("Error loading MMKV", err);
         navigationRef.current?.reset({
           index: 0,
           routes: [{ name: "RolePicker" }],

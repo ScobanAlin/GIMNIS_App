@@ -9,8 +9,8 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../../App";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { RootStackParamList } from "../types";
+import { storage } from "../utils/storage"; // our MMKV wrapper
 
 const ROLE_KEY = "tablet_role";
 const JUDGE_ID_KEY = "judge_id";
@@ -21,15 +21,16 @@ export default function RolePicker() {
 
   const [judgeId, setJudgeId] = useState("");
 
-  const chooseRole = async (role: string, screen: keyof RootStackParamList) => {
-    await AsyncStorage.setItem(ROLE_KEY, role);
+  const chooseRole = (role: string, screen: keyof RootStackParamList) => {
+    // save role
+    storage.set(ROLE_KEY, role);
 
     if (role === "Judge") {
       if (!judgeId) {
         Alert.alert("Error", "Please enter Judge ID");
         return;
       }
-      await AsyncStorage.setItem(JUDGE_ID_KEY, judgeId);
+      storage.set(JUDGE_ID_KEY, judgeId);
 
       navigation.replace("JudgeLoginScreen", {
         judgeId: parseInt(judgeId, 10),

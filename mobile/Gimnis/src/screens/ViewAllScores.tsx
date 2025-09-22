@@ -261,6 +261,7 @@ export default function ViewAllScores() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedCompetitor, setSelectedCompetitor] = useState<any | null>(null);
+const [competitorSearch, setCompetitorSearch] = useState("");
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingJudge, setEditingJudge] = useState<{
@@ -366,6 +367,21 @@ export default function ViewAllScores() {
     return '#FDCB6E';
   };
 
+const filteredCompetitors = competitors.filter((c) => {
+  const searchLower = competitorSearch.toLowerCase();
+  return (
+    String(c.id).includes(searchLower) ||
+    (c.club && c.club.toLowerCase().includes(searchLower)) ||
+    (c.category && c.category.toLowerCase().includes(searchLower)) ||
+    (c.members &&
+      c.members.some(
+        (m: any) =>
+          m.first_name.toLowerCase().includes(searchLower) ||
+          m.last_name.toLowerCase().includes(searchLower)
+      ))
+  );
+});
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -445,6 +461,16 @@ export default function ViewAllScores() {
           ))}
         </ScrollView>
 
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search competitors..."
+            value={competitorSearch}
+            onChangeText={setCompetitorSearch}
+            placeholderTextColor="#B2BEC3"
+          />
+        </View>
+
         {/* Competitors List */}
         <ScrollView
           style={styles.competitorsContainer}
@@ -467,7 +493,7 @@ export default function ViewAllScores() {
           )}
 
           {!loading &&
-            competitors.map((c) => (
+            filteredCompetitors.map((c) => (
               <View
                 key={c.id}
                 style={[
@@ -567,8 +593,7 @@ export default function ViewAllScores() {
                           v !== "N/A"
                       ).length
                     }{" "}
-                    / {14}{" "}
-                    scores submitted
+                    / {14} scores submitted
                   </Text>
                 </View>
 

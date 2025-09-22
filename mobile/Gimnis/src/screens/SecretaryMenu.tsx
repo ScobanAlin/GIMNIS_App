@@ -10,12 +10,13 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../types";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BASE_URL } from "../config";
+import { storage } from "../utils/storage"; // MMKV wrapper
 
 const ROLE_KEY = "tablet_role";
 const JUDGE_ID_KEY = "judge_id";
 const JUDGE_NAME_KEY = "judge_name";
+
 export default function SecretaryMenu() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -24,7 +25,7 @@ export default function SecretaryMenu() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total: 0, categories: 0 });
 
-  const handleTitlePress = async () => {
+  const handleTitlePress = () => {
     const newCount = tapCount + 1;
     setTapCount(newCount);
 
@@ -35,7 +36,9 @@ export default function SecretaryMenu() {
 
     if (newCount >= 7) {
       setTapCount(0);
-      await AsyncStorage.multiRemove([ROLE_KEY, JUDGE_ID_KEY, JUDGE_NAME_KEY]);
+      storage.delete(ROLE_KEY);
+      storage.delete(JUDGE_ID_KEY);
+      storage.delete(JUDGE_NAME_KEY);
       navigation.replace("RolePicker");
     }
   };
@@ -138,10 +141,7 @@ export default function SecretaryMenu() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8F9FA",
-  },
+  container: { flex: 1, backgroundColor: "#F8F9FA" },
   header: {
     paddingHorizontal: 24,
     paddingTop: 20,
@@ -168,10 +168,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "500",
   },
-  content: {
-    flex: 1,
-    padding: 24,
-  },
+  content: { flex: 1, padding: 24 },
   menuCard: {
     height: 120,
     borderRadius: 24,
@@ -207,12 +204,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 20,
   },
-  icon: {
-    fontSize: 32,
-  },
-  textContainer: {
-    flex: 1,
-  },
+  icon: { fontSize: 32 },
+  textContainer: { flex: 1 },
   menuTitle: {
     fontSize: 22,
     fontWeight: "700",
@@ -232,11 +225,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  arrow: {
-    fontSize: 20,
-    color: "#FFFFFF",
-    fontWeight: "bold",
-  },
+  arrow: { fontSize: 20, color: "#FFFFFF", fontWeight: "bold" },
   statsContainer: {
     marginTop: 20,
     backgroundColor: "#FFFFFF",
@@ -255,10 +244,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: "center",
   },
-  statsRow: {
-    flexDirection: "row",
-    gap: 16,
-  },
+  statsRow: { flexDirection: "row", gap: 16 },
   statCard: {
     flex: 1,
     backgroundColor: "#F8F9FA",

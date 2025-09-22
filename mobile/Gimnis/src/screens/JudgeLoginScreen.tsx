@@ -10,8 +10,8 @@ import {
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../types";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BASE_URL } from "../config";
+import { storage } from "../utils/storage"; // ✅ MMKV wrapper
 
 type JudgeLoginRouteProp = RouteProp<RootStackParamList, "JudgeLoginScreen">;
 
@@ -27,21 +27,18 @@ export default function JudgeLoginScreen() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [judgeId, setJudgeId] = useState<number | null>(null);
-  const [role, setRole] = useState<string>("Judge");
   const [tapCount, setTapCount] = useState(0);
 
   useEffect(() => {
     if (route.params?.judgeId) {
       setJudgeId(route.params.judgeId);
     } else {
-      // fallback from storage
-      AsyncStorage.getItem(JUDGE_ID_KEY).then((id) => {
-        if (id) setJudgeId(parseInt(id, 10));
-      });
+      const storedId = storage.getString(JUDGE_ID_KEY);
+      if (storedId) setJudgeId(parseInt(storedId, 10));
     }
   }, [route.params]);
 
-  const handleTitlePress = async () => {
+  const handleTitlePress = () => {
     const newCount = tapCount + 1;
     setTapCount(newCount);
 
@@ -52,7 +49,9 @@ export default function JudgeLoginScreen() {
 
     if (newCount >= 7) {
       setTapCount(0);
-      await AsyncStorage.multiRemove([ROLE_KEY, JUDGE_ID_KEY, JUDGE_NAME_KEY]);
+      storage.delete(ROLE_KEY);
+      storage.delete(JUDGE_ID_KEY);
+      storage.delete(JUDGE_NAME_KEY);
       navigation.replace("RolePicker");
     }
   };
@@ -77,7 +76,6 @@ export default function JudgeLoginScreen() {
     }
 
     const inferredRole = getRoleFromJudgeId(judgeId);
-    setRole(inferredRole);
 
     try {
       const res = await fetch(`${BASE_URL}/api/judges/${judgeId}/login`, {
@@ -91,8 +89,10 @@ export default function JudgeLoginScreen() {
 
       if (!res.ok) throw new Error("Failed to update judge in database");
 
-      await AsyncStorage.setItem("judge_name", `${firstName} ${lastName}`);
-      await AsyncStorage.setItem(ROLE_KEY, inferredRole);
+      // ✅ persist to MMKV
+      storage.set(JUDGE_NAME_KEY, `${firstName} ${lastName}`);
+      storage.set(JUDGE_ID_KEY, judgeId.toString());
+      storage.set(ROLE_KEY, "Judge"); // keep original marker role
 
       if (inferredRole === "principal") {
         navigation.replace("PrincipalJudgeMenu");

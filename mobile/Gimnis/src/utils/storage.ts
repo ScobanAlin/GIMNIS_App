@@ -1,16 +1,26 @@
 // src/utils/storage.ts
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { MMKV } from "react-native-mmkv";
 
-const ROLE_KEY = "tablet_role";
+export const storage = new MMKV();
 
-export async function saveRole(role: string) {
-  await AsyncStorage.setItem(ROLE_KEY, role);
+// helper functions
+export function setItem(key: string, value: string) {
+  storage.set(key, value);
 }
 
-export async function loadRole(): Promise<string | null> {
-  return await AsyncStorage.getItem(ROLE_KEY);
+export function getItem(key: string): string | null {
+  return storage.getString(key) ?? null;
 }
 
-export async function clearRole() {
-  await AsyncStorage.removeItem(ROLE_KEY);
+export function removeItem(key: string) {
+  storage.delete(key);
 }
+
+export function clearAll() {
+  storage.clearAll();
+}
+
+export const getString = (key: string) => storage.getString(key) ?? null;
+export const getNumber = (key: string) => storage.getNumber(key) ?? null;
+export const setString = (key: string, value: string) => storage.set(key, value);
+export const setNumber = (key: string, value: number) => storage.set(key, value);

@@ -76,6 +76,7 @@ export default function Competitors() {
   const [currentCompetitor, setCurrentCompetitor] =
     useState<CurrentCompetitor>(null);
   const [activeShow, setActiveShow] = useState<number | null>(null);
+const [competitorSearch, setCompetitorSearch] = useState("");
 
   const fetchCompetitorsByCategory = async (category: string) => {
     try {
@@ -201,6 +202,19 @@ export default function Competitors() {
     cat.toLowerCase().includes(search.toLowerCase())
   );
 
+const filteredCompetitors = competitors.filter((c) => {
+  const searchLower = competitorSearch.toLowerCase();
+  return (
+    c.club.toLowerCase().includes(searchLower) ||
+    c.category.toLowerCase().includes(searchLower) ||
+    c.members.some(
+      (m) =>
+        m.first_name.toLowerCase().includes(searchLower) ||
+        m.last_name.toLowerCase().includes(searchLower)
+    )
+  );
+});
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -296,6 +310,16 @@ export default function Competitors() {
           ))}
         </ScrollView>
 
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search competitors..."
+            value={competitorSearch}
+            onChangeText={setCompetitorSearch}
+            placeholderTextColor="#B2BEC3"
+          />
+        </View>
+
         {/* Competitors List */}
         <ScrollView
           scrollEnabled={true}
@@ -318,7 +342,7 @@ export default function Competitors() {
             </View>
           )}
 
-          {competitors.map((c) => (
+          {filteredCompetitors.map((c) => (
             <View
               key={c.id}
               style={[
