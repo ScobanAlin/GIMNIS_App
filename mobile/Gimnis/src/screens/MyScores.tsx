@@ -298,10 +298,10 @@ const filteredScores = scores.filter((s) => {
                   {s.category.startsWith("Individual") ? (
                     <View style={styles.individualMember}>
                       <Text style={styles.memberName}>
-                        {s.members[0]?.first_name} {s.members[0]?.last_name}
+                        {s.members[0]?.last_name} {s.members[0]?.first_name}
                       </Text>
                       <Text style={styles.memberDetails}>
-                        {s.members[0]?.sex} • {s.members[0]?.age} years
+                        • {s.members[0]?.sex}
                       </Text>
                     </View>
                   ) : (
@@ -311,11 +311,9 @@ const filteredScores = scores.filter((s) => {
                         s.members.map((m) => (
                           <View key={m.id} style={styles.memberItem}>
                             <Text style={styles.memberName}>
-                              {m.first_name} {m.last_name}
+                             {m.last_name} {m.first_name}
                             </Text>
-                            <Text style={styles.memberDetails}>
-                              {m.sex} • {m.age}
-                            </Text>
+                            <Text style={styles.memberDetails}> • {m.sex}</Text>
                           </View>
                         ))
                       ) : (

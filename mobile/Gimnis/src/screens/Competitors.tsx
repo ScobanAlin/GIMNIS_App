@@ -78,9 +78,12 @@ export default function Competitors() {
   const [activeShow, setActiveShow] = useState<number | null>(null);
 const [competitorSearch, setCompetitorSearch] = useState("");
 
-  const fetchCompetitorsByCategory = async (category: string) => {
+  const fetchCompetitorsByCategory = async (
+    category: string,
+    showLoader = true
+  ) => {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       const res = await fetch(
         `${BASE_URL}/api/competitors/by-category?category=${encodeURIComponent(
           category
@@ -93,9 +96,10 @@ const [competitorSearch, setCompetitorSearch] = useState("");
     } catch (e: any) {
       setError(e.message || "Network error");
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
+
 
   const fetchCurrentCompetitor = async () => {
     try {
@@ -136,7 +140,6 @@ const [competitorSearch, setCompetitorSearch] = useState("");
       if (!res.ok)
         throw new Error(data?.error || "Failed to delete competitor");
       setCompetitors((prev) => prev.filter((c) => c.id !== id));
-      Alert.alert("Deleted", "Competitor removed successfully.");
     } catch (e: any) {
       Alert.alert("Error", e.message || "Could not delete competitor.");
     }
@@ -176,7 +179,6 @@ const [competitorSearch, setCompetitorSearch] = useState("");
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to start show");
       setActiveShow(id);
-      Alert.alert("Live Show", "Competitor is now being shown on screen.");
       fetchActiveShow();
     } catch (err: any) {
       Alert.alert("Error", err.message || "Could not start show.");
@@ -186,16 +188,22 @@ const [competitorSearch, setCompetitorSearch] = useState("");
   useEffect(() => {
     fetchCurrentCompetitor();
     fetchActiveShow();
+
     const interval = setInterval(() => {
       fetchCurrentCompetitor();
       fetchActiveShow();
+
+      if (selectedCategory) {
+        fetchCompetitorsByCategory(selectedCategory, false); // 🚫 no flicker
+      }
     }, 3000);
+
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedCategory]);
 
   const handleCategoryPress = (cat: string) => {
     setSelectedCategory(cat);
-    fetchCompetitorsByCategory(cat);
+    fetchCompetitorsByCategory(cat, true);
   };
 
   const filteredCategories = categories.filter((cat) =>
@@ -243,7 +251,7 @@ const filteredCompetitors = competitors.filter((c) => {
               <View style={styles.membersContainer}>
                 {currentCompetitor.members.map((m) => (
                   <Text key={m.id} style={styles.memberText}>
-                    {m.first_name} {m.last_name} ({m.sex}, {m.age})
+                    {m.last_name} {m.first_name} ({m.sex})
                   </Text>
                 ))}
               </View>
@@ -388,10 +396,10 @@ const filteredCompetitors = competitors.filter((c) => {
                 {c.category.startsWith("Individual") ? (
                   <View style={styles.individualMember}>
                     <Text style={styles.memberName}>
-                      {c.members[0]?.first_name} {c.members[0]?.last_name}
+                      {c.members[0]?.last_name} {c.members[0]?.first_name}
                     </Text>
                     <Text style={styles.memberDetails}>
-                      {c.members[0]?.sex} • {c.members[0]?.age} years
+                      • {c.members[0]?.sex}
                     </Text>
                   </View>
                 ) : (
@@ -400,11 +408,9 @@ const filteredCompetitors = competitors.filter((c) => {
                       c.members.map((m) => (
                         <View key={m.id} style={styles.memberItem}>
                           <Text style={styles.memberName}>
-                            {m.first_name} {m.last_name}
+                            {m.last_name} {m.first_name}
                           </Text>
-                          <Text style={styles.memberDetails}>
-                            {m.sex} • {m.age}
-                          </Text>
+                          <Text style={styles.memberDetails}>• {m.sex}</Text>
                         </View>
                       ))
                     ) : (
@@ -682,7 +688,7 @@ const styles = StyleSheet.create({
     color: "#2D3436",
     flex: 1,
     textAlign: "right",
-    marginRight: 60,
+    paddingRight: 100, // To avoid overlap with show button
   },
   categoryName: {
     fontSize: 14,

@@ -80,7 +80,8 @@ async function deleteScore(
 
 function calculateTotalScore(
   scores: Record<string, any>,
-  category: string
+  category: string,
+  members: { sex: "M" | "F" }[]
 ): number {
   const getMiddleTwo = (arr: number[]) => {
     if (arr.length < 4) return 0;
@@ -122,24 +123,37 @@ function calculateTotalScore(
       .filter(([k]) => k.toLowerCase().includes("principal"))
       .map(([_, v]) => parseFloat(v as string))[0] || 0;
 
+  // 🟢 Default divisor
   let divisor = 2.0;
-  if (category.toLowerCase().includes("mixed")) divisor = 1.9;
-  else if (category.toLowerCase().includes("women")) divisor = 1.8;
+
+  // 🟢 Only apply divisor logic if category is Seniors
+  if (
+    category.toLowerCase().includes("seniors") &&
+    (category.toLowerCase().includes("trio") ||
+      category.toLowerCase().includes("group"))
+  ) {
+    const sexes = members.map((m) => m.sex);
+    const hasMen = sexes.includes("M");
+    const hasWomen = sexes.includes("F");
+
+    if (hasMen && hasWomen) divisor = 1.9;
+    else if (hasWomen) divisor = 1.8;
+    else divisor = 2.0;
+  }
 
   const artistryPart = getMiddleTwo(artistryScores) / 2;
   const executionPart = getMiddleTwo(executionScores) / 2;
   const difficultyPart = (difficultyScores[0] + difficultyScores[1]) / 2;
 
   const penaltyPart =
-    (diffPenalties[0] + diffPenalties[1]) / 2 +
-    linePenalty +
-    principalPenalty;
+    (diffPenalties[0] + diffPenalties[1]) / 2 + linePenalty + principalPenalty;
 
   const rawTotal =
-    (artistryPart + executionPart) + difficultyPart / divisor - penaltyPart;
+    artistryPart + executionPart + difficultyPart / divisor - penaltyPart;
 
   return Math.max(0, parseFloat(rawTotal.toFixed(3)));
 }
+
 
 async function fetchCompetitors(category: string) {
   const res = await fetch(
@@ -289,6 +303,28 @@ const [competitorSearch, setCompetitorSearch] = useState("");
     }
   };
 
+useEffect(() => {
+  let interval: NodeJS.Timeout;
+
+  if (modalVisible && selectedCompetitor) {
+    // Start polling every 3 seconds
+    interval = setInterval(async () => {
+      try {
+        const fresh = await fetchCompetitorScores(selectedCompetitor.id);
+        setSelectedCompetitor((prev: any) =>
+          prev ? { ...prev, ...fresh } : prev
+        );
+      } catch (err) {
+        console.error("Failed to refresh scores:", err);
+      }
+    }, 3000);
+  }
+
+  return () => {
+    if (interval) clearInterval(interval);
+  };
+}, [modalVisible, selectedCompetitor?.id]);
+
   useEffect(() => {
     fetchCurrentCompetitor();
     const interval = setInterval(fetchCurrentCompetitor, 5000);
@@ -333,7 +369,6 @@ const [competitorSearch, setCompetitorSearch] = useState("");
         editingJudge.score_type
       );
 
-      Alert.alert("Success", "Score updated");
 
       setSelectedCompetitor((prev: any) =>
         prev
@@ -406,8 +441,8 @@ const filteredCompetitors = competitors.filter((c) => {
             </View>
             <Text style={styles.currentName}>
               {currentCompetitor.members
-                ?.map((m: any) => `${m.first_name} ${m.last_name}`)
-                .join(", ")}
+                ?.map((m: any) => ` ${m.last_name} ${m.first_name}`)
+                .join("/ ")}
             </Text>
             <Text style={styles.currentDetail}>
               {currentCompetitor.category} • {currentCompetitor.club}
@@ -518,10 +553,10 @@ const filteredCompetitors = competitors.filter((c) => {
                 {c.category.startsWith("Individual") ? (
                   <View style={styles.individualMember}>
                     <Text style={styles.memberName}>
-                      {c.members[0]?.first_name} {c.members[0]?.last_name}
+                      {c.members[0]?.last_name} {c.members[0]?.first_name}
                     </Text>
                     <Text style={styles.memberDetails}>
-                      {c.members[0]?.sex} • {c.members[0]?.age} years
+                      • {c.members[0]?.sex}
                     </Text>
                   </View>
                 ) : (
@@ -531,11 +566,9 @@ const filteredCompetitors = competitors.filter((c) => {
                       c.members.map((m: any) => (
                         <View key={m.id} style={styles.memberItem}>
                           <Text style={styles.memberName}>
-                            {m.first_name} {m.last_name}
+                            {m.last_name} {m.first_name}
                           </Text>
-                          <Text style={styles.memberDetails}>
-                            {m.sex} • {m.age}
-                          </Text>
+                          <Text style={styles.memberDetails}>• {m.sex}</Text>
                         </View>
                       ))
                     ) : (
@@ -548,7 +581,7 @@ const filteredCompetitors = competitors.filter((c) => {
                   style={styles.detailsBtn}
                   onPress={() => openDetails(c)}
                 >
-                  <Text style={styles.detailsBtnText}>View Details</Text>
+                  <Text style={styles.detailsBtnText}>View Scores</Text>
                 </Pressable>
               </View>
             ))}
@@ -564,7 +597,7 @@ const filteredCompetitors = competitors.filter((c) => {
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>
                     {selectedCompetitor.category.startsWith("Individual")
-                      ? `${selectedCompetitor.members[0]?.first_name} ${selectedCompetitor.members[0]?.last_name}`
+                      ? `${selectedCompetitor.members[0]?.last_name} ${selectedCompetitor.members[0]?.first_name} `
                       : "Team Scores"}
                   </Text>
                   <Pressable
@@ -607,7 +640,8 @@ const filteredCompetitors = competitors.filter((c) => {
                     <Text style={styles.totalScoreValue}>
                       {calculateTotalScore(
                         selectedCompetitor.scores,
-                        selectedCompetitor.category
+                        selectedCompetitor.category,
+                        selectedCompetitor.members
                       ).toFixed(3)}
                     </Text>
                   </View>
@@ -739,8 +773,6 @@ const filteredCompetitors = competitors.filter((c) => {
                                           scoreType
                                         );
 
-                                        Alert.alert("Success", "Score deleted");
-
                                         const fresh =
                                           await fetchCompetitorScores(
                                             selectedCompetitor.id
@@ -821,11 +853,11 @@ const filteredCompetitors = competitors.filter((c) => {
                       try {
                         if (selectedCompetitor.is_validated) {
                           await unvalidateCompetitor(selectedCompetitor.id);
-                          Alert.alert("Success", "Competitor unvalidated");
                         } else {
                           const total = calculateTotalScore(
                             selectedCompetitor.scores,
-                            selectedCompetitor.category
+                            selectedCompetitor.category,
+                            selectedCompetitor.members
                           );
 
                           Alert.alert(
@@ -841,12 +873,6 @@ const filteredCompetitors = competitors.filter((c) => {
                                   await validateCompetitor(
                                     selectedCompetitor.id,
                                     total
-                                  );
-                                  Alert.alert(
-                                    "Success",
-                                    `Competitor validated! Total: ${total.toFixed(
-                                      3
-                                    )}`
                                   );
 
                                   if (selectedCategory) {
@@ -1210,7 +1236,7 @@ const styles = StyleSheet.create({
     color: "#2D3436",
     flex: 1,
     textAlign: "right",
-    marginRight: 80,
+    paddingRight: 100,
   },
   categoryName: {
     fontSize: 14,

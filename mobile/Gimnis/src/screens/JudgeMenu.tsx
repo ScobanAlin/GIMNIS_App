@@ -63,8 +63,9 @@ const name = storage.getString("judge_name") || "Unknown";
   const [loading, setLoading] = useState(true);
   const [currentCompetitor, setCurrentCompetitor] =
     useState<CurrentCompetitor>(null);
-  const [scores, setScores] = useState<Record<string, string>>({});
-  const [tapCount, setTapCount] = useState(0);
+const [scores, setScores] = useState<Record<string, string>>(
+  judgeRole === "difficulty" ? { difficulty_penalization: "0.0" } : {}
+);  const [tapCount, setTapCount] = useState(0);
 
   function mapRoleById(judgeId: number): string {
     if (judgeId === 1) return "principal";
@@ -150,7 +151,7 @@ const name = storage.getString("judge_name") || "Unknown";
     // 🧑‍🤝‍🧑 Collect team members into a string
     const membersList =
       currentCompetitor.members
-        .map((m) => `${m.first_name} ${m.last_name}`)
+        .map((m) => `${m.last_name} ${m.first_name}`)
         .join(", ") || "No members listed";
 
     // 📝 Collect current scores into a string
@@ -231,7 +232,6 @@ const name = storage.getString("judge_name") || "Unknown";
         }
       }
 
-      Alert.alert("Success", "Your scores have been submitted!");
       setScores({});
       fetchCurrentCompetitor();
     } catch (err: any) {
@@ -447,11 +447,9 @@ const name = storage.getString("judge_name") || "Unknown";
                 renderItem={({ item }) => (
                   <View style={styles.memberItem}>
                     <Text style={styles.memberName}>
-                      {item.first_name} {item.last_name}
+                      {item.last_name} {item.first_name}
                     </Text>
-                    <Text style={styles.memberDetails}>
-                      {item.sex} • {item.age} years
-                    </Text>
+                    <Text style={styles.memberDetails}>{item.sex}</Text>
                   </View>
                 )}
                 scrollEnabled={false}

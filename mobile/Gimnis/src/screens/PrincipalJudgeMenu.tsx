@@ -45,8 +45,8 @@ export default function PrincipalJudgeMenu() {
   const [loading, setLoading] = useState(true);
   const [currentCompetitor, setCurrentCompetitor] =
     useState<CurrentCompetitor>(null);
-  const [linePenalty, setLinePenalty] = useState("");
-  const [principalPenalty, setPrincipalPenalty] = useState("");
+  const [linePenalty, setLinePenalty] = useState("0.0");
+  const [principalPenalty, setPrincipalPenalty] = useState("0.0");
   const [tapCount, setTapCount] = useState(0);
 
   // ✅ principal judge always has ID = 1
@@ -66,7 +66,9 @@ export default function PrincipalJudgeMenu() {
           const competitorName =
             data.name ||
             (data.members
-              ? data.members.map((m: any) => m.first_name).join(", ")
+              ? data.members
+                  .map((m: any) => `${m.last_name} ${m.first_name} `)
+                  .join("/ ")
               : "Unknown Competitor");
 
           setCurrentCompetitor({ ...data, name: competitorName });
@@ -177,7 +179,6 @@ export default function PrincipalJudgeMenu() {
         if (!res.ok) throw new Error(data?.error || "Failed to submit score");
       }
 
-      Alert.alert("Success", "Penalties have been submitted!");
       setLinePenalty("");
       setPrincipalPenalty("");
       fetchCurrentCompetitor();
@@ -252,11 +253,9 @@ export default function PrincipalJudgeMenu() {
                 renderItem={({ item }) => (
                   <View style={styles.memberItem}>
                     <Text style={styles.memberName}>
-                      {item.first_name} {item.last_name}
+                      {item.last_name} {item.first_name}
                     </Text>
-                    <Text style={styles.memberDetails}>
-                      {item.sex} • {item.age} years
-                    </Text>
+                    <Text style={styles.memberDetails}>• {item.sex}</Text>
                   </View>
                 )}
                 scrollEnabled={false}

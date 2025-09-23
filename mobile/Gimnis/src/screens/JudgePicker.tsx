@@ -56,7 +56,7 @@ export default function JudgePicker() {
     navigation.navigate("JudgeMenu", {
       judgeId: judge.id,
       role: judge.role,
-      name: `${judge.first_name} ${judge.last_name}`,
+      name: `${judge.last_name} ${judge.first_name} `,
     });
   };
 
@@ -144,7 +144,7 @@ export default function JudgePicker() {
                 </View>
                 <View style={styles.textContainer}>
                   <Text style={styles.judgeName}>
-                    {item.first_name} {item.last_name}
+                    {item.last_name} {item.first_name}
                   </Text>
                   <Text
                     style={[
