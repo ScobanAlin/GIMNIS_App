@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
-
+import { sendLog } from "./src/utils/logger";
 import { RootStackParamList } from "./src/types";
 
 import RolePicker from "./src/screens/RolePicker";
@@ -35,6 +35,8 @@ function mapRoleById(judgeId: number): string {
 
 export default function App() {
   const [loading, setLoading] = useState(true);
+  const [initialRoute, setInitialRoute] =
+    useState<keyof RootStackParamList>("RolePicker");
 
   useEffect(() => {
     const loadRole = () => {
@@ -43,65 +45,35 @@ export default function App() {
         const judgeIdStr = storage.getString(JUDGE_ID_KEY);
         const judgeName = storage.getString(JUDGE_NAME_KEY);
 
+        sendLog(
+          `MMKV values: role=${role}, judgeId=${judgeIdStr}, judgeName=${judgeName}`
+        );
+
         if (!role) {
-          navigationRef.current?.reset({
-            index: 0,
-            routes: [{ name: "RolePicker" }],
-          });
+          setInitialRoute("RolePicker");
         } else if (role === "Secretary") {
-          navigationRef.current?.reset({
-            index: 0,
-            routes: [{ name: "SecretaryMenu" }],
-          });
+          setInitialRoute("SecretaryMenu");
         } else if (role === "Judge") {
           const judgeId = judgeIdStr ? parseInt(judgeIdStr, 10) : null;
 
           if (!judgeId) {
-            navigationRef.current?.reset({
-              index: 0,
-              routes: [{ name: "RolePicker" }],
-            });
+            setInitialRoute("RolePicker");
           } else {
             const mappedRole = mapRoleById(judgeId);
             if (!judgeName) {
-              navigationRef.current?.reset({
-                index: 0,
-                routes: [
-                  {
-                    name: "JudgeLoginScreen",
-                    params: { judgeId, role: mappedRole },
-                  },
-                ],
-              });
+              setInitialRoute("JudgeLoginScreen");
             } else if (mappedRole === "principal") {
-              navigationRef.current?.reset({
-                index: 0,
-                routes: [{ name: "PrincipalJudgeMenu" }],
-              });
+              setInitialRoute("PrincipalJudgeMenu");
             } else {
-              navigationRef.current?.reset({
-                index: 0,
-                routes: [
-                  {
-                    name: "JudgeMenu",
-                    params: { judgeId, role: mappedRole, name: judgeName },
-                  },
-                ],
-              });
+              setInitialRoute("JudgeMenu");
             }
           }
         } else {
-          navigationRef.current?.reset({
-            index: 0,
-            routes: [{ name: "RolePicker" }],
-          });
+          setInitialRoute("RolePicker");
         }
       } catch (err) {
         console.error("Error loading MMKV", err);
-        navigationRef.current?.reset({
-          index: 0,
-          routes: [{ name: "RolePicker" }],
-        });
+        setInitialRoute("RolePicker");
       } finally {
         setLoading(false);
       }
@@ -120,7 +92,7 @@ export default function App() {
 
   return (
     <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator initialRouteName="RolePicker">
+      <Stack.Navigator initialRouteName={initialRoute}>
         <Stack.Screen
           name="RolePicker"
           component={RolePicker}

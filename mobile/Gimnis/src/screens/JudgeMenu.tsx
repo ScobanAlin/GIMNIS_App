@@ -138,13 +138,30 @@ export default function JudgeMenu() {
 
   const confirmVote = () => {
     if (!currentCompetitor) return;
+
     if (!allFieldsValid()) {
       Alert.alert("Error", "Please fill in all required score fields.");
       return;
     }
+
+    // 🧑‍🤝‍🧑 Collect team members into a string
+    const membersList =
+      currentCompetitor.members
+        .map((m) => `${m.first_name} ${m.last_name}`)
+        .join(", ") || "No members listed";
+
+    // 📝 Collect current scores into a string
+    const scoreLines = Object.entries(scores)
+      .map(([key, val]) => `${key.replace(/_/g, " ")}: ${val}`)
+      .join("\n");
+
     Alert.alert(
       "Confirm Vote",
-      `Submit your scores for ${currentCompetitor.category} – ${currentCompetitor.club}?`,
+      `Submitting scores for:\n` +
+        `${membersList}\n\n` + // team members
+        `Category: ${currentCompetitor.category}\n` +
+        `Club: ${currentCompetitor.club}\n\n` +
+        `Scores:\n${scoreLines}`, // scores
       [
         { text: "Cancel", style: "cancel" },
         { text: "Submit", style: "destructive", onPress: voteCompetitor },

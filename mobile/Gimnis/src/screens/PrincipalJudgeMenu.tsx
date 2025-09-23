@@ -229,9 +229,80 @@ export default function PrincipalJudgeMenu() {
             <Text style={styles.loadingText}>Loading competitor...</Text>
           </View>
         ) : currentCompetitor ? (
-          // competitor card...
           <View style={styles.competitorCard}>
-            {/* ... same as your original code for competitor display ... */}
+            <View style={styles.competitorHeader}>
+              <Text style={styles.competitorTitle}>Current Competitor</Text>
+              <View style={styles.liveIndicator}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>LIVE</Text>
+              </View>
+            </View>
+
+            <Text style={styles.competitorName}>{currentCompetitor.name}</Text>
+            <Text style={styles.competitorDetails}>
+              {currentCompetitor.category}
+            </Text>
+            <Text style={styles.clubName}>{currentCompetitor.club}</Text>
+
+            <View style={styles.membersSection}>
+              <Text style={styles.membersTitle}>Team Members</Text>
+              <FlatList
+                data={currentCompetitor.members}
+                keyExtractor={(m) => m.id.toString()}
+                renderItem={({ item }) => (
+                  <View style={styles.memberItem}>
+                    <Text style={styles.memberName}>
+                      {item.first_name} {item.last_name}
+                    </Text>
+                    <Text style={styles.memberDetails}>
+                      {item.sex} • {item.age} years
+                    </Text>
+                  </View>
+                )}
+                scrollEnabled={false}
+              />
+            </View>
+
+            <View style={styles.penaltySection}>
+              <Text style={styles.penaltySectionTitle}>Penalty Assessment</Text>
+
+              <View style={styles.penaltyInputs}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Line Penalization</Text>
+                  <TextInput
+                    style={styles.penaltyInput}
+                    placeholder="0.0"
+                    keyboardType="numeric"
+                    value={linePenalty}
+                    onChangeText={(t) => handleScoreChange("line", t)}
+                    placeholderTextColor="#B2BEC3"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Principal Penalization</Text>
+                  <TextInput
+                    style={styles.penaltyInput}
+                    placeholder="0.0"
+                    keyboardType="numeric"
+                    value={principalPenalty}
+                    onChangeText={(t) => handleScoreChange("principal", t)}
+                    placeholderTextColor="#B2BEC3"
+                  />
+                </View>
+              </View>
+            </View>
+
+            <Pressable
+              style={[
+                styles.submitBtn,
+                !allFieldsValid() && styles.submitBtnDisabled,
+              ]}
+              onPress={confirmVote}
+              disabled={!allFieldsValid()}
+            >
+              <Text style={styles.submitBtnText}>Submit Penalties</Text>
+            </Pressable>
           </View>
         ) : (
           <View style={styles.waitingContainer}>
