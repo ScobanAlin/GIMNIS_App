@@ -55,21 +55,24 @@ export default function JudgeMenu() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute();
-  const {
-    judgeId,
-    role: judgeRole,
-    name,
-  } = (route.params as JudgeMenuRouteParams) || {
-    judgeId: 0,
-    role: "unknown",
-    name: "Unknown",
-  };
+  const judgeId = parseInt(storage.getString("judge_id") || "0", 10);
+const judgeRole = mapRoleById(judgeId);
+const name = storage.getString("judge_name") || "Unknown";
+
 
   const [loading, setLoading] = useState(true);
   const [currentCompetitor, setCurrentCompetitor] =
     useState<CurrentCompetitor>(null);
   const [scores, setScores] = useState<Record<string, string>>({});
   const [tapCount, setTapCount] = useState(0);
+
+  function mapRoleById(judgeId: number): string {
+    if (judgeId === 1) return "principal";
+    if (judgeId >= 2 && judgeId <= 5) return "execution";
+    if (judgeId >= 6 && judgeId <= 9) return "artistry";
+    if (judgeId >= 10 && judgeId <= 11) return "difficulty";
+    return "judge";
+  }
 
   const handleTitlePress = () => {
     const newCount = tapCount + 1;

@@ -56,7 +56,7 @@ export default function PrincipalJudgeMenu() {
     try {
       const res = await fetch(
         `${BASE_URL}/api/votes/current?judge_id=${judgeId}`
-      );
+      )
       const data = await res.json();
 
       if (res.ok && data && data.competitor_id) {
