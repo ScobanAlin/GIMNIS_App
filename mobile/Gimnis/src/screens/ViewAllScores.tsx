@@ -84,9 +84,29 @@ function calculateTotalScore(
   members: { sex: "M" | "F" }[]
 ): number {
   const getMiddleTwo = (arr: number[]) => {
-    if (arr.length < 4) return 0;
+    if (arr.length < 4) return [0, 0];
     const sorted = [...arr].sort((a, b) => a - b);
-    return sorted[1] + sorted[2];
+    return [sorted[1], sorted[2]];
+  };
+
+  const applyTolerance = (arr: number[]): number => {
+    if (arr.length < 4) return 0;
+    const [m1, m2] = getMiddleTwo(arr);
+    const avgMiddle = (m1 + m2) / 2;
+    const diff = Math.abs(m1 - m2);
+
+    // pick allowed tolerance based on final score range
+    let allowed = 0.6; // default lowest range
+    if (avgMiddle >= 8.0) allowed = 0.3;
+    else if (avgMiddle >= 7.0) allowed = 0.4;
+    else if (avgMiddle >= 6.0) allowed = 0.5;
+
+    if (diff > allowed) {
+      // ❌ tolerance exceeded → use average of all scores
+      return arr.reduce((a, b) => a + b, 0) / arr.length;
+    }
+    // ✅ within tolerance → use average of the two middle scores
+    return avgMiddle;
   };
 
   const artistryScores = Object.entries(scores)
@@ -123,10 +143,10 @@ function calculateTotalScore(
       .filter(([k]) => k.toLowerCase().includes("principal"))
       .map(([_, v]) => parseFloat(v as string))[0] || 0;
 
+  //
   // 🟢 Default divisor
   let divisor = 2.0;
 
-  // 🟢 Only apply divisor logic if category is Seniors
   if (
     category.toLowerCase().includes("seniors") &&
     (category.toLowerCase().includes("trio") ||
@@ -141,9 +161,14 @@ function calculateTotalScore(
     else divisor = 2.0;
   }
 
-  const artistryPart = getMiddleTwo(artistryScores) / 2;
-  const executionPart = getMiddleTwo(executionScores) / 2;
-  const difficultyPart = (difficultyScores[0] + difficultyScores[1]) / 2;
+  // ✅ apply tolerance logic
+  const artistryPart = applyTolerance(artistryScores);
+  const executionPart = applyTolerance(executionScores);
+
+  const difficultyPart =
+    difficultyScores.length >= 2
+      ? (difficultyScores[0] + difficultyScores[1]) / 2
+      : difficultyScores[0] || 0;
 
   const penaltyPart =
     (diffPenalties[0] + diffPenalties[1]) / 2 + linePenalty + principalPenalty;
@@ -154,10 +179,123 @@ function calculateTotalScore(
   return Math.max(0, parseFloat(rawTotal.toFixed(3)));
 }
 
+// NEW: Section-specific calculation helpers
+function calculateSectionTotal(
+  scores: Record<string, any>,
+  category: string,
+  members: { sex: "M" | "F" }[],
+  sectionType: string
+): number {
+  const getMiddleTwo = (arr: number[]) => {
+    if (arr.length < 4) return [0, 0];
+    const sorted = [...arr].sort((a, b) => a - b);
+    return [sorted[1], sorted[2]];
+  };
+
+  const applyTolerance = (arr: number[]): number => {
+    if (arr.length < 4) return 0;
+    const [m1, m2] = getMiddleTwo(arr);
+    const avgMiddle = (m1 + m2) / 2;
+    const diff = Math.abs(m1 - m2);
+
+    let allowed = 0.6;
+    if (avgMiddle >= 8.0) allowed = 0.3;
+    else if (avgMiddle >= 7.0) allowed = 0.4;
+    else if (avgMiddle >= 6.0) allowed = 0.5;
+
+    if (diff > allowed) {
+      return arr.reduce((a, b) => a + b, 0) / arr.length;
+    }
+    return avgMiddle;
+  };
+
+  switch (sectionType) {
+    case "execution": {
+      const executionScores = Object.entries(scores)
+        .filter(([k]) => k.toLowerCase().includes("execution"))
+        .map(([_, v]) => parseFloat(v as string))
+        .filter((v) => !isNaN(v));
+      return executionScores.length >= 4 ? applyTolerance(executionScores) : 0;
+    }
+
+    case "artistry": {
+      const artistryScores = Object.entries(scores)
+        .filter(([k]) => k.toLowerCase().includes("artistry"))
+        .map(([_, v]) => parseFloat(v as string))
+        .filter((v) => !isNaN(v));
+      return artistryScores.length >= 4 ? applyTolerance(artistryScores) : 0;
+    }
+
+    case "difficulty": {
+      const difficultyScores = Object.entries(scores)
+        .filter(
+          ([k]) =>
+            k.toLowerCase().includes("difficulty") &&
+            !k.toLowerCase().includes("penalization")
+        )
+        .map(([_, v]) => parseFloat(v as string))
+        .filter((v) => !isNaN(v));
+
+      let divisor = 2.0;
+      if (
+        category.toLowerCase().includes("seniors") &&
+        (category.toLowerCase().includes("trio") ||
+          category.toLowerCase().includes("group"))
+      ) {
+        const sexes = members.map((m) => m.sex);
+        const hasMen = sexes.includes("M");
+        const hasWomen = sexes.includes("F");
+
+        if (hasMen && hasWomen) divisor = 1.9;
+        else if (hasWomen) divisor = 1.8;
+        else divisor = 2.0;
+      }
+
+      const difficultyPart =
+        difficultyScores.length >= 2
+          ? (difficultyScores[0] + difficultyScores[1]) / 2
+          : difficultyScores[0] || 0;
+
+      return difficultyPart / divisor;
+    }
+
+    case "difficulty_penalization": {
+      const diffPenalties = Object.entries(scores)
+        .filter(([k]) => k.toLowerCase().includes("difficulty_penalization"))
+        .map(([_, v]) => parseFloat(v as string))
+        .filter((v) => !isNaN(v));
+
+      return diffPenalties.length >= 2
+        ? (diffPenalties[0] + diffPenalties[1]) / 2
+        : diffPenalties[0] || 0;
+    }
+
+    case "line_penalization": {
+      return (
+        Object.entries(scores)
+          .filter(([k]) => k.toLowerCase().includes("line"))
+          .map(([_, v]) => parseFloat(v as string))[0] || 0
+      );
+    }
+
+    case "principal_penalization": {
+      return (
+        Object.entries(scores)
+          .filter(([k]) => k.toLowerCase().includes("principal"))
+          .map(([_, v]) => parseFloat(v as string))[0] || 0
+      );
+    }
+
+    default:
+      return 0;
+  }
+}
 
 async function fetchCompetitors(category: string) {
   const res = await fetch(
-    `${BASE_URL}/api/competitors/by-category?category=${encodeURIComponent(category)}`
+    `${BASE_URL}/api/competitors/by-category?category=${encodeURIComponent(
+      category
+    )}`
   );
   if (!res.ok) throw new Error("Failed to fetch competitors");
   return await res.json();
@@ -190,7 +328,7 @@ function hasDiscrepancy(group: [string, any][]) {
     .map(([_, v]) => (typeof v === "number" ? v : parseFloat(v)))
     .filter((v) => !isNaN(v));
   if (nums.length < 2) return false;
-  return Math.max(...nums) - Math.min(...nums) > 1.0;
+  return Math.max(...nums) - Math.min(...nums) > 1.1;
 }
 
 function hasAnyDifference(group: [string, any][]) {
@@ -274,8 +412,10 @@ export default function ViewAllScores() {
   const [loading, setLoading] = useState(false);
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedCompetitor, setSelectedCompetitor] = useState<any | null>(null);
-const [competitorSearch, setCompetitorSearch] = useState("");
+  const [selectedCompetitor, setSelectedCompetitor] = useState<any | null>(
+    null
+  );
+  const [competitorSearch, setCompetitorSearch] = useState("");
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingJudge, setEditingJudge] = useState<{
@@ -303,27 +443,27 @@ const [competitorSearch, setCompetitorSearch] = useState("");
     }
   };
 
-useEffect(() => {
-  let interval: NodeJS.Timeout;
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
 
-  if (modalVisible && selectedCompetitor) {
-    // Start polling every 3 seconds
-    interval = setInterval(async () => {
-      try {
-        const fresh = await fetchCompetitorScores(selectedCompetitor.id);
-        setSelectedCompetitor((prev: any) =>
-          prev ? { ...prev, ...fresh } : prev
-        );
-      } catch (err) {
-        console.error("Failed to refresh scores:", err);
-      }
-    }, 3000);
-  }
+    if (modalVisible && selectedCompetitor) {
+      // Start polling every 3 seconds
+      interval = setInterval(async () => {
+        try {
+          const fresh = await fetchCompetitorScores(selectedCompetitor.id);
+          setSelectedCompetitor((prev: any) =>
+            prev ? { ...prev, ...fresh } : prev
+          );
+        } catch (err) {
+          console.error("Failed to refresh scores:", err);
+        }
+      }, 3000);
+    }
 
-  return () => {
-    if (interval) clearInterval(interval);
-  };
-}, [modalVisible, selectedCompetitor?.id]);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [modalVisible, selectedCompetitor?.id]);
 
   useEffect(() => {
     fetchCurrentCompetitor();
@@ -369,7 +509,6 @@ useEffect(() => {
         editingJudge.score_type
       );
 
-
       setSelectedCompetitor((prev: any) =>
         prev
           ? {
@@ -395,27 +534,27 @@ useEffect(() => {
   );
 
   const getScoreTypeColor = (scoreType: string) => {
-    if (scoreType.includes('penalization')) return '#FF7675';
-    if (scoreType === 'execution') return '#00B894';
-    if (scoreType === 'artistry') return '#6C5CE7';
-    if (scoreType === 'difficulty') return '#74B9FF';
-    return '#FDCB6E';
+    if (scoreType.includes("penalization")) return "#FF7675";
+    if (scoreType === "execution") return "#00B894";
+    if (scoreType === "artistry") return "#6C5CE7";
+    if (scoreType === "difficulty") return "#74B9FF";
+    return "#FDCB6E";
   };
 
-const filteredCompetitors = competitors.filter((c) => {
-  const searchLower = competitorSearch.toLowerCase();
-  return (
-    String(c.id).includes(searchLower) ||
-    (c.club && c.club.toLowerCase().includes(searchLower)) ||
-    (c.category && c.category.toLowerCase().includes(searchLower)) ||
-    (c.members &&
-      c.members.some(
-        (m: any) =>
-          m.first_name.toLowerCase().includes(searchLower) ||
-          m.last_name.toLowerCase().includes(searchLower)
-      ))
-  );
-});
+  const filteredCompetitors = competitors.filter((c) => {
+    const searchLower = competitorSearch.toLowerCase();
+    return (
+      String(c.id).includes(searchLower) ||
+      (c.club && c.club.toLowerCase().includes(searchLower)) ||
+      (c.category && c.category.toLowerCase().includes(searchLower)) ||
+      (c.members &&
+        c.members.some(
+          (m: any) =>
+            m.first_name.toLowerCase().includes(searchLower) ||
+            m.last_name.toLowerCase().includes(searchLower)
+        ))
+    );
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -657,7 +796,8 @@ const filteredCompetitors = competitors.filter((c) => {
                     const renderGroup = (
                       label: string,
                       group: [string, any][],
-                      editable: boolean
+                      editable: boolean,
+                      sectionType: string
                     ) => {
                       if (!group || group.length === 0) return null;
 
@@ -679,6 +819,14 @@ const filteredCompetitors = competitors.filter((c) => {
                       }
 
                       const scoreType = inferScoreTypeFromLabel(label);
+
+                      // Calculate section total
+                      const sectionTotal = calculateSectionTotal(
+                        selectedCompetitor.scores,
+                        selectedCompetitor.category,
+                        selectedCompetitor.members,
+                        sectionType
+                      );
 
                       return (
                         <View
@@ -798,29 +946,71 @@ const filteredCompetitors = competitors.filter((c) => {
                               )}
                             </View>
                           ))}
+
+                          {/* NEW: Section Total Display */}
+                          {sectionTotal > 0 && (
+                            <View style={styles.sectionTotalContainer}>
+                              <Text style={styles.sectionTotalLabel}>
+                                Section Total:
+                              </Text>
+                              <View
+                                style={[
+                                  styles.sectionTotalBadge,
+                                  {
+                                    backgroundColor:
+                                      getScoreTypeColor(scoreType),
+                                  },
+                                ]}
+                              >
+                                <Text style={styles.sectionTotalValue}>
+                                  {sectionType.includes("penalization")
+                                    ? `-${sectionTotal.toFixed(3)}`
+                                    : sectionTotal.toFixed(3)}
+                                </Text>
+                              </View>
+                            </View>
+                          )}
                         </View>
                       );
                     };
 
                     return (
                       <>
-                        {renderGroup("Execution", groups.execution, true)}
-                        {renderGroup("Artistry", groups.artistry, true)}
-                        {renderGroup("Difficulty", groups.difficulty, true)}
+                        {renderGroup(
+                          "Execution",
+                          groups.execution,
+                          true,
+                          "execution"
+                        )}
+                        {renderGroup(
+                          "Artistry",
+                          groups.artistry,
+                          true,
+                          "artistry"
+                        )}
+                        {renderGroup(
+                          "Difficulty",
+                          groups.difficulty,
+                          true,
+                          "difficulty"
+                        )}
                         {renderGroup(
                           "Difficulty Penalization",
                           groups.difficulty_penalization,
-                          true
+                          true,
+                          "difficulty_penalization"
                         )}
                         {renderGroup(
                           "Line Penalization",
                           groups.line_penalization,
-                          true
+                          true,
+                          "line_penalization"
                         )}
                         {renderGroup(
                           "Principal Judge Penalization",
                           groups.principal_penalization,
-                          true
+                          true,
+                          "principal_penalization"
                         )}
                       </>
                     );
@@ -1453,6 +1643,33 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "600",
+  },
+  // NEW: Section Total Styles
+  sectionTotalContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E1E8ED",
+  },
+  sectionTotalLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2D3436",
+  },
+  sectionTotalBadge: {
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    minWidth: 60,
+    alignItems: "center",
+  },
+  sectionTotalValue: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800",
   },
   modalActions: {
     flexDirection: "row",

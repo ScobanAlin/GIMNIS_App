@@ -173,71 +173,90 @@ const [scores, setScores] = useState<Record<string, string>>(
     );
   };
 
-  const voteCompetitor = async () => {
-    if (!currentCompetitor) return;
-    try {
-      const payloads = Object.entries(scores)
-        .filter(([, v]) => v && !isNaN(Number(v)))
-        .map(([score_type, value]) => {
-          let finalValue = parseFloat(value);
-          if (score_type === "execution_penalization") {
-            return {
-              competitor_id: currentCompetitor.competitor_id,
-              judge_id: judgeId,
-              score_type: "execution",
-              value: 10 - finalValue,
-            };
-          }
+const voteCompetitor = async () => {
+  if (!currentCompetitor) return;
+
+  try {
+    // 📝 Build payloads from entered scores
+    const payloads = Object.entries(scores)
+      .filter(([, v]) => v && !isNaN(Number(v)))
+      .map(([score_type, value]) => {
+        let finalValue = parseFloat(value);
+
+        // ⚡ Execution penalization is inverted (10 - penalization)
+        if (score_type === "execution_penalization") {
           return {
             competitor_id: currentCompetitor.competitor_id,
             judge_id: judgeId,
-            score_type,
-            value: finalValue,
+            score_type: "execution",
+            value: 10 - finalValue,
           };
-        });
+        }
 
-      // 🔥 If difficulty judge → fetch all difficulty judges from API
-      let difficultyJudgeIds: number[] = [];
-      if (judgeRole === "difficulty") {
-        const res = await fetch(`${BASE_URL}/api/judges`);
-        if (!res.ok) throw new Error("Could not fetch judges list");
-        const allJudges = await res.json();
+        return {
+          competitor_id: currentCompetitor.competitor_id,
+          judge_id: judgeId,
+          score_type,
+          value: finalValue,
+        };
+      });
 
-        difficultyJudgeIds = allJudges
-          .filter((j: any) => j.role === "difficulty" && j.id !== judgeId)
-          .map((j: any) => j.id);
-      }
+    // 🔥 If difficulty judge → mirror scores to other difficulty judges
+    let difficultyJudgeIds: number[] = [];
+    if (judgeRole === "difficulty") {
+      const res = await fetch(`${BASE_URL}/api/judges`);
+      if (!res.ok) throw new Error("Could not fetch judges list");
+      const allJudges = await res.json();
 
-      for (const p of payloads) {
-        // Always submit my own
-        const res = await fetch(`${BASE_URL}/api/scores`, {
+      difficultyJudgeIds = allJudges
+        .filter((j: any) => j.role === "difficulty" && j.id !== judgeId)
+        .map((j: any) => j.id);
+    }
+
+    // 🚀 Submit payloads
+    for (const p of payloads) {
+      // Submit own score
+      const res = await fetch(`${BASE_URL}/api/scores`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(p),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to submit score");
+
+      // Mirror to other difficulty judges if needed
+      for (const diffJudgeId of difficultyJudgeIds) {
+        const cloned = { ...p, judge_id: diffJudgeId };
+        const res2 = await fetch(`${BASE_URL}/api/scores`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(p),
+          body: JSON.stringify(cloned),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Failed to submit score");
-
-        // If difficulty judge → clone for others
-        for (const diffJudgeId of difficultyJudgeIds) {
-          const cloned = { ...p, judge_id: diffJudgeId };
-          const res2 = await fetch(`${BASE_URL}/api/scores`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(cloned),
-          });
-          const data2 = await res2.json();
-          if (!res2.ok)
-            throw new Error(data2?.error || "Failed to submit mirrored score");
-        }
+        const data2 = await res2.json();
+        if (!res2.ok)
+          throw new Error(data2?.error || "Failed to submit mirrored score");
       }
-
-      setScores({});
-      fetchCurrentCompetitor();
-    } catch (err: any) {
-      Alert.alert("Error", err.message || "Could not submit score(s)");
     }
-  };
+
+    // ✅ Reset scores after successful submit
+    if (judgeRole === "difficulty") {
+      setScores({ difficulty_penalization: "0.0" });
+    } else if (judgeRole === "principal") {
+      setScores({
+        line_penalization: "0.0",
+        principal_penalization: "0.0",
+      });
+    } else {
+      setScores({});
+    }
+
+    // 🔄 Refresh competitor
+    fetchCurrentCompetitor();
+  } catch (err: any) {
+    Alert.alert("Error", err.message || "Could not submit score(s)");
+  }
+};
+
 
   useEffect(() => {
     fetchCurrentCompetitor();

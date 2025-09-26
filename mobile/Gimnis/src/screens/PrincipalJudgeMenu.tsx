@@ -179,8 +179,8 @@ export default function PrincipalJudgeMenu() {
         if (!res.ok) throw new Error(data?.error || "Failed to submit score");
       }
 
-      setLinePenalty("");
-      setPrincipalPenalty("");
+      setLinePenalty("0.0");
+      setPrincipalPenalty("0.0");
       fetchCurrentCompetitor();
     } catch (err: any) {
       Alert.alert("Error", err.message || "Could not submit penalties");
